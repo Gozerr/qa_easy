@@ -1,0 +1,14 @@
+project_id = "qa-na-paltsakh"
+
+[db.seed]
+enabled = true
+sql_paths = ["./seed.sql"]
+
+[functions.telegram-auth]
+verify_jwt = false
+
+[functions.quiz-api]
+verify_jwt = false
+
+[functions.ai-admin]
+verify_jwt = false
