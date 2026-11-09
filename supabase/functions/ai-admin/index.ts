@@ -3,6 +3,8 @@ import { verifySessionToken } from '../_shared/sessionToken.ts'
 import {
   GENERATOR_MODEL,
   REVIEWER_MODEL,
+  isSoleAdmin,
+  isZeroPricedModel,
   parseModelJson,
   reviewerPayload,
   validateGeneratedQuestion,
@@ -16,8 +18,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-
 let freeModelCache: { checkedAt: number; models: Set<string> } | null = null
 
 function isAdmin(telegramUserId: string): boolean {
-  const configuredIds = (Deno.env.get('TELEGRAM_ADMIN_IDS') ?? '').split(',').map((id) => id.trim()).filter(Boolean)
-  return configuredIds.some((id) => id === telegramUserId)
+  return isSoleAdmin(Deno.env.get('TELEGRAM_ADMIN_IDS'), telegramUserId)
 }
 
 async function assertConfiguredFreeModels() {
@@ -31,12 +32,8 @@ async function assertConfiguredFreeModels() {
   const models = new Set<string>()
   if (Array.isArray(catalog?.data)) {
     for (const model of catalog.data) {
-      if (typeof model?.id === 'string' && model && typeof model === 'object') {
-        const pricing = model.pricing
-        if (pricing && typeof pricing === 'object' && Number(pricing.prompt) === 0 && Number(pricing.completion) === 0) {
-          models.add(model.id)
-        }
-      }
+      if (isZeroPricedModel(model, GENERATOR_MODEL)) models.add(GENERATOR_MODEL)
+      if (isZeroPricedModel(model, REVIEWER_MODEL)) models.add(REVIEWER_MODEL)
     }
   }
   freeModelCache = { checkedAt: Date.now(), models }

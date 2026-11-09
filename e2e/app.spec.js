@@ -47,6 +47,14 @@ test('тема сохраняется после перезагрузки', asyn
   await expect(root).toHaveAttribute('data-theme', nextTheme)
 })
 
+  test('рейтинг в обычном браузере требует подтверждённую Telegram-сессию', async ({ page }) => {
+    await page.getByRole('link', { name: 'Рейтинг' }).click()
+    await expect(page.getByRole('heading', { name: 'Рейтинг' })).toBeVisible()
+    await expect(page.locator('.leaderboard-unavailable')).toContainText('Рейтинг доступен в Telegram')
+    await expect(page.locator('.leaderboard-table')).toHaveCount(0)
+    await expect(page.locator('.leaderboard-settings')).toHaveCount(0)
+  })
+
 test('сброс прогресса требует подтверждения и очищает данные', async ({ page }) => {
   await page.evaluate(() => localStorage.setItem('qa-na-paltsakh:progress', JSON.stringify({
     version: 1,
@@ -94,7 +102,7 @@ test('malformed localStorage и вредоносный query остаются н
 
 test('все экраны не переполняют viewport в двух темах на телефоне, планшете и desktop', async ({ page }) => {
   const widths = [320, 360, 390, 768, 1280]
-  const routes = ['./', 'theory', 'practice', 'interview', 'daily', 'profile']
+    const routes = ['./', 'theory', 'practice', 'interview', 'daily', 'profile', 'leaderboard']
 
   for (const width of widths) {
     await page.setViewportSize({ width, height: 850 })

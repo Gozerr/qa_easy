@@ -2,7 +2,7 @@
 
 ## Текущее состояние
 
-Клиент, migration, повторяемый seed и три Edge Functions подготовлены. GitHub remote подключён и первоначальный commit опубликован в `main`. Supabase migration, seed и функции ещё не применялись к проекту; до завершения шагов ниже Telegram cloud mode не активен. Обычный браузер продолжает работать в локальном режиме.
+Для проекта `qa_easy` (`txbdivgcltrolmogttpk`) уже применены базовая и AI migrations, загружены 30 вопросов и 30 Daily templates, развернуты три Edge Functions (`ACTIVE`). Созданы migration ledger entries; `ALLOWED_ORIGINS`, `PUBLIC_APP_URL` и `TELEGRAM_SESSION_SECRET` настроены. GitHub Pages опубликован по адресу `https://gozerr.github.io/qa_easy/`. Для рейтинга добавлена новая миграция `20261111000000_leaderboard.sql`; её нужно применить перед публикацией новой версии API. Участие в рейтинге добровольное, по выбранному псевдониму.
 
 Не используйте ключ с префиксом `sb_secret_` в клиенте или GitHub Variables. Он не является Project URL. Этот ключ и отправленный в чат токен бота нужно немедленно отозвать/перевыпустить в соответствующих Dashboard, так как они были раскрыты вне secret store. В проекте эти значения не добавлены.
 
@@ -64,7 +64,7 @@ select count(*) from public.daily_task_templates where is_active;
 - `TELEGRAM_BOT_TOKEN` — только новый токен от BotFather.
 - `TELEGRAM_SESSION_SECRET` — случайная строка минимум 32 байта, сгенерируйте её локально, например `openssl rand -hex 32`, и вставьте прямо в Dashboard.
 - `ALLOWED_ORIGINS` — точный HTTPS origin опубликованного приложения без пути, например `https://<ваш-github-pages-host>`; можно перечислить origins через запятую. `localhost:5173` разрешён только для разработки.
-- `TELEGRAM_ADMIN_IDS` — comma-separated Telegram numeric user IDs, которым разрешена AI-панель. Получите ID из подтверждённого профиля `public.profiles` после входа в Mini App. Не берите ID из непроверенного клиентского запроса.
+- `TELEGRAM_ADMIN_IDS` — ровно один Telegram numeric user ID владельца. AI function отклоняет пустое значение, некорректный ID и списки из нескольких ID. Получите свой ID из подтверждённого профиля `public.profiles` после входа в Mini App; не используйте ID из непроверенного клиентского запроса.
 - `OPENROUTER_API_KEY` — ключ только в Supabase Edge Function Secrets; не передавайте его в Vite, GitHub Variables, SQL, браузер или чат. После раскрытия предыдущий ключ нужно отозвать и создать новый.
 - Необязательно: `PUBLIC_APP_URL` — фактический публичный HTTPS URL приложения для OpenRouter attribution.
 - Необязательно: `TELEGRAM_INIT_DATA_MAX_AGE_SECONDS=3600`.
@@ -112,7 +112,7 @@ npx supabase functions deploy ai-admin --no-verify-jwt
 4. Откройте app в Telegram на iOS/Android/Desktop. Проверьте light/dark theme, safe area, viewport, BackButton, ежедневную задачу и одну server-scored попытку.
 5. Проверьте Supabase **Edge Function Logs** и **Table Editor**: не должно быть `initData`, bot token или session token в logs; должны появиться profile, quiz session, attempt и progress.
 
-Публикация исходного кода в GitHub выполнена. Production deployment ещё не подтверждён: проверьте успешный Pages workflow в **Actions** и фактический URL в environment `github-pages`. Cloud mode дополнительно требует применённой migration, seed, Edge Function secrets и deployment трёх функций.
+GitHub Pages и Supabase schema/functions уже развёрнуты. Для cloud mode добавьте перевыпущенный `TELEGRAM_BOT_TOKEN` в Supabase Edge Function Secrets и `VITE_SUPABASE_URL`/`VITE_SUPABASE_PUBLISHABLE_KEY` в GitHub Actions Variables, затем повторно запустите workflow **Проверка и публикация**.
 
 ## 10. Резервное копирование и восстановление
 
@@ -123,10 +123,8 @@ npx supabase functions deploy ai-admin --no-verify-jwt
 
 ## Ручные действия
 
-1. Отозвать скомпрометированный bot token и Supabase secret key; не менять publishable key только из-за публичного назначения, но проверить настройки проекта.
-2. Войти в Supabase CLI, связать локальную папку с проектом и применить миграцию после dry-run.
-3. Выполнить `npm run supabase:seed`, применить `supabase/seed.sql` в SQL Editor и проверить counts.
-4. Задать Edge Function secrets, allowed origin, новый OpenRouter key и `TELEGRAM_ADMIN_IDS` в Supabase Dashboard.
-5. Развернуть три Edge Functions и проверить их логи без записи token/prompt.
-6. Добавить две Supabase public Variables в GitHub Actions settings и проверить Pages deployment.
-7. Назначить фактический HTTPS URL в BotFather и проверить Mini App на реальном Telegram client.
+1. Отозвать раскрытые bot token, Supabase secret key и OpenRouter key; не менять publishable key только из-за публичного назначения, но проверить RLS.
+2. Добавить новый `TELEGRAM_BOT_TOKEN` в Supabase Edge Function Secrets. `TELEGRAM_SESSION_SECRET` и `ALLOWED_ORIGINS` уже настроены.
+3. Если нужен AI admin, `OPENROUTER_API_KEY` уже задан в Supabase; после первого проверенного Telegram входа установить в `TELEGRAM_ADMIN_IDS` ровно свой numeric ID. Другие ID функция не принимает.
+4. Добавить GitHub Actions Variables `VITE_SUPABASE_URL` и `VITE_SUPABASE_PUBLISHABLE_KEY`, затем повторно запустить Pages workflow.
+5. Назначить `https://gozerr.github.io/qa_easy/` в BotFather и проверить Mini App на реальном Telegram client.

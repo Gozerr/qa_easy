@@ -44,10 +44,13 @@ Unit-тесты проверяют Fisher–Yates, ID-ответы, schema ва�
 - `src/lib/progressStorage.js` — версия схемы localStorage и безопасная обработка отсутствующих или повреждённых данных.
 - `src/composables/useProgress.js` — очки, ответы, ежедневная серия, достижения и сохранённые сессии.
 - `src/lib/supabaseClient.js` и `src/lib/cloudApi.js` — необязательный Supabase-клиент, проверка config/response и HTTPS вызовы Edge Functions.
+- `src/views/LeaderboardView.vue` — серверный рейтинг с добровольным участием; в публичной таблице показываются только выбранный псевдоним и подтверждённые сервером очки.
 - `supabase/migrations/` — закрытая схема БД, RLS и транзакционные RPC.
 - `supabase/functions/` — Telegram initData verification, короткоживущая server session, protected quiz API и AI admin gateway.
 - `supabase/functions/ai-admin/` — server-only OpenRouter workflow: Gemma free generation, blind Nemotron review, bounded revisions и ручная публикация администратором.
 - `src/views/AiAdminView.vue` — доступная только allowlisted Telegram IDs панель AI-черновиков; новые вопросы не публикуются автоматически.
+
+Для участия в рейтинге откройте вкладку **Рейтинг** из Telegram Mini App, задайте псевдоним и включите участие. По умолчанию профиль скрыт; Telegram ID и имя аккаунта не выводятся. Перед публикацией версии с рейтингом примените новую миграцию `20261111000000_leaderboard.sql`.
 
 ### Как добавить вопрос
 
@@ -95,7 +98,7 @@ Workflow выполняет проверки для push и pull request в `mai
 4. Для кнопки меню используйте `/setmenubutton`, выберите бота и задайте текст кнопки и тот же URL приложения.
 5. Откройте ссылку из Telegram и проверьте тему, высоту viewport и BackButton. Для локального тестирования можно использовать официальную тестовую среду Telegram и защищённый публичный туннель к dev-серверу.
 
-Edge Functions пока не развёрнуты в Supabase, bot token должен быть заново выпущен после раскрытия в чате и добавлен только в Supabase secrets. Пока ручная настройка не завершена, cloud scoring недоступен. Официальные руководства: [Telegram Mini Apps](https://core.telegram.org/bots/webapps), [SDK](https://docs.telegram-mini-apps.com/packages/tma-js-sdk) и [Vue bindings](https://docs.telegram-mini-apps.com/packages/tma-js-sdk-vue).
+Приложение опубликовано на GitHub Pages, Supabase schema/seed применены, три Edge Functions активны. Для cloud mode ещё нужно добавить новый bot token в Supabase Edge Function Secrets и задать публичные `VITE_SUPABASE_URL` и `VITE_SUPABASE_PUBLISHABLE_KEY` в GitHub Actions Variables. Для AI admin дополнительно нужны новый `OPENROUTER_API_KEY` и `TELEGRAM_ADMIN_IDS`. Официальные руководства: [Telegram Mini Apps](https://core.telegram.org/bots/webapps), [SDK](https://docs.telegram-mini-apps.com/packages/tma-js-sdk) и [Vue bindings](https://docs.telegram-mini-apps.com/packages/tma-js-sdk-vue).
 
 ## Ограничения MVP
 

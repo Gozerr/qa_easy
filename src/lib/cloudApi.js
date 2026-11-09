@@ -6,6 +6,7 @@ import { isSupabaseConfigured, supabaseClient } from './supabaseClient.js'
 const MAX_COUNTER = 1_000_000_000
 const SAFE_ID = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}$/
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+const LEADERBOARD_NAME = /^[\p{L}\p{N}][\p{L}\p{N} _-]{1,23}$/u
 
 export const cloudStatus = ref(isSupabaseConfigured ? 'browser' : 'unconfigured')
 export const cloudError = ref('')
@@ -42,6 +43,40 @@ export function normalizeServerStats(value) {
     dailyCompletions: [...new Set(value.dailyCompletions)],
     currentStreak: value.currentStreak,
     longestStreak: value.longestStreak,
+  }
+}
+
+export function normalizeLeaderboard(value) {
+  if (!value || typeof value !== 'object' || !Array.isArray(value.entries) || value.entries.length > 50) return null
+  if (!Number.isSafeInteger(value.totalParticipants) || value.totalParticipants < 0 || value.totalParticipants > MAX_COUNTER) return null
+  if (value.currentUserRank !== null && (!Number.isSafeInteger(value.currentUserRank) || value.currentUserRank < 1 || value.currentUserRank > value.totalParticipants)) return null
+  if (!value.preferences || typeof value.preferences.enabled !== 'boolean'
+    || typeof value.preferences.displayName !== 'string'
+    || (value.preferences.displayName !== '' && !LEADERBOARD_NAME.test(value.preferences.displayName))) return null
+
+  const entries = []
+  let previousRank = 0
+  for (const entry of value.entries) {
+    if (!entry || !Number.isSafeInteger(entry.rank) || entry.rank <= previousRank || entry.rank > value.totalParticipants
+      || typeof entry.displayName !== 'string' || !LEADERBOARD_NAME.test(entry.displayName)
+      || !Number.isSafeInteger(entry.xp) || entry.xp < 0 || entry.xp > MAX_COUNTER
+      || !Number.isSafeInteger(entry.answeredCount) || entry.answeredCount < 0 || entry.answeredCount > MAX_COUNTER
+      || !Number.isSafeInteger(entry.accuracy) || entry.accuracy < 0 || entry.accuracy > 100) return null
+    previousRank = entry.rank
+    entries.push({
+      rank: entry.rank,
+      displayName: entry.displayName,
+      xp: entry.xp,
+      answeredCount: entry.answeredCount,
+      accuracy: entry.accuracy,
+    })
+  }
+
+  return {
+    entries,
+    currentUserRank: value.currentUserRank,
+    totalParticipants: value.totalParticipants,
+    preferences: { enabled: value.preferences.enabled, displayName: value.preferences.displayName },
   }
 }
 
@@ -139,6 +174,21 @@ export async function fetchCloudDailyTask() {
     throw invokeFailure()
   }
   return task
+}
+
+export async function fetchLeaderboard() {
+  const data = await invokeAuthenticated({ action: 'get_leaderboard' })
+  const leaderboard = normalizeLeaderboard(data)
+  if (!leaderboard) throw invokeFailure()
+  return leaderboard
+}
+
+export async function updateLeaderboardPreferences({ enabled, displayName }) {
+  const data = await invokeAuthenticated({ action: 'update_leaderboard', enabled, displayName })
+  const preferences = data.preferences
+  if (!preferences || typeof preferences.enabled !== 'boolean' || typeof preferences.displayName !== 'string'
+    || (preferences.displayName !== '' && !LEADERBOARD_NAME.test(preferences.displayName))) throw invokeFailure()
+  return { enabled: preferences.enabled, displayName: preferences.displayName }
 }
 
 export async function refreshCloudProgress() {

@@ -1,10 +1,10 @@
 # Отчёт аудита безопасности
 
-**Область:** текущий статический Vue/Vite workspace, Supabase migrations и Edge Function source, OpenRouter gateway, GitHub Actions, client storage и quiz logic. **Дата проверки:** 9 ноября 2026. **Важно:** GitHub remote подключён, первоначальный commit опубликован в `main`; production workflow ещё требует проверки. Supabase migrations/functions не развертывались; live OpenRouter inference не выполнялся.
+**Область:** текущий статический Vue/Vite workspace, Supabase migrations и Edge Function source, OpenRouter gateway, GitHub Actions, client storage и quiz logic. **Дата проверки:** 9 ноября 2026. **Важно:** добавлен opt-in leaderboard; его новая миграция и frontend/API пока не развернуты. Базовая/AI Supabase schema, seed и три прежние функции активны; live OpenRouter inference не выполнялся.
 
 ## Краткий риск-статус
 
-Клиентская поверхность укреплена: schema/size bounds, текстовый рендер, fallback navigation, CSP meta, строгий quiz ID flow и расширенные тесты. Серверный проект подготовлен, но cloud protection не действует в production, пока владелец не применит миграцию, импортирует seed, развернёт функции и задаст secrets. Локальные баллы не являются доверенными.
+Клиентская поверхность укреплена: schema/size bounds, текстовый рендер, fallback navigation, CSP meta, строгий quiz ID flow и расширенные тесты. Серверная схема и функции развернуты, но cloud auth/scoring не активируются до установки нового Telegram bot token и GitHub public Variables. Локальные баллы не являются доверенными.
 
 ## Находки
 
@@ -29,19 +29,19 @@
 - **Проверка:** unit migration/corruption tests и E2E persistence/reset tests.
 - **Остаток:** без настроенного backend client-only score не authoritative.
 
-### SEC-03 — Supabase protection пока не активирована
+### SEC-03 — Cloud auth ожидает credentials
 
-- **Критичность:** High для заявленной cloud identity/scoring до deployment; сейчас никакое пользовательское облачное чтение/начисление не доступно.
+- **Критичность:** High для cloud identity/scoring до настройки credentials; схема создана, но Telegram auth пока не может подтвердить пользователя.
 - **Затронутые файлы:** `supabase/migrations/20261109000000_qa_training.sql`, `supabase/functions/telegram-auth/index.ts`, `supabase/functions/quiz-api/index.ts`, `.env.local`.
-- **Воспроизведение:** в workspace нет Supabase CLI login/configuration, функции и миграция не были отправлены в project; backend requests завершатся ошибкой/локальный браузер останется local mode.
+- **Воспроизведение:** новый `TELEGRAM_BOT_TOKEN` и GitHub Variables `VITE_SUPABASE_URL`/`VITE_SUPABASE_PUBLISHABLE_KEY` ещё не настроены; клиент остаётся в local mode.
 - **Решение:** реализованы RLS-deny-by-default, HMAC initData verification, short-lived server token, server-picked session, RPC correctness/idempotency and per-user reset.
 - **Проверка:** unit tests подписывают test-only initData и проверяют auth_date/tampering/session expiry; SQL migration static test проверяет RLS/revoke/unique constraints.
-- **Остаток:** нужен владелец Supabase, новый BotFather token, secret setup, migration/seed/functions deployment и GitHub Variables.
+- **Остаток:** добавить перевыпущенный BotFather token в Supabase secrets и две публичные GitHub Variables. `TELEGRAM_SESSION_SECRET` и `ALLOWED_ORIGINS` уже настроены.
 
 ### SEC-07 — OpenRouter AI gateway и ручная публикация
 
 - **Критичность:** High до deployment/secret rotation; Medium после корректной настройки allowlist и функций.
-- **Реализация:** отдельная Edge Function проверяет HMAC session и `TELEGRAM_ADMIN_IDS`; ключ `OPENROUTER_API_KEY` читается только на сервере. AI таблицы закрыты RLS. Генератор и reviewer фиксированы на согласованных exact `:free` IDs; перед inference catalog проверяет нулевую цену prompt/completion, а provider fallback выключен.
+- **Реализация:** отдельная Edge Function проверяет HMAC session и ровно один валидный Telegram ID в `TELEGRAM_ADMIN_IDS`; списки нескольких администраторов отклоняются. Ключ `OPENROUTER_API_KEY` читается только на сервере. AI таблицы закрыты RLS. Генератор и reviewer фиксированы на согласованных exact `:free` IDs; перед inference catalog проверяет нулевую цену prompt/completion, а provider fallback выключен.
 - **Проверка содержимого:** Gemma возвращает bounded JSON с четырьмя вариантами; Nemotron получает вопрос и варианты без expected answer/explanation/hint и независимо выбирает option ID. Допускаются максимум две revisions. Только совпавший reviewer answer и approval переводят draft в approved; затем требуется отдельная ручная публикация. Лимит генерации — 5 в час на admin ID.
 - **Тесты:** unit проверяют схемы и blind payload; static boundary tests проверяют RLS, allowlist, модели, no fallback, revision cap и publish gate.
 - **Остаток:** live inference не тестировался и ключ OpenRouter не использовался, поскольку был раскрыт в сообщении; владелец должен отозвать его, создать новый secret, задать admin IDs и развернуть миграцию/function. Без этого AI gateway не работает.
@@ -65,22 +65,23 @@
 ### SEC-06 — Ограниченная проверка Git history
 
 - **Критичность:** низкая для текущего содержимого; ранее раскрытые credentials требуют отдельной ротации.
-- **Факт:** remote `https://github.com/Gozerr/qa_easy.git` подключён, опубликована ветка `main` с одним первоначальным коммитом. `.env.local` и `.env` не отслеживаются Git. Предшествующей истории в локальном репозитории нет.
+- **Факт:** remote `https://github.com/Gozerr/qa_easy.git` подключён, ветка `main` опубликована. `.env.local` и `.env` не отслеживаются Git. Историю до создания локального репозитория проверить нельзя.
 - **Действие:** проверьте GitHub Secret scanning после включения функции. Если credentials когда-либо попадали в опубликованную историю, удаление commit не заменяет rotation.
 
 ## Исправления и тестовые доказательства
 
 - Unit tests включают content/schema, local storage bounds/migration, Supabase config/response validation, Telegram HMAC/freshness/tampering, custom session signature/expiry, AI schema/blind reviewer payload, admin allowlist/RLS and publish invariants.
 - Playwright E2E tests покрывают Daily persistence, Junior/Middle, theory, theme/reset, malformed localStorage/XSS-like query, reset focus и responsive layout для нескольких viewport widths × themes.
-- Production build после UI/Supabase changes проходил ранее; финальный повтор всех команд указан в итоговом статусе.
+- Supabase live check: 30 активных вопросов, 30 Daily templates; migration ledger содержит обе версии, три Edge Functions имеют статус `ACTIVE`; пустой auth-запрос корректно отклонён с HTTP 400.
+- Production build, 29 unit tests, 6 E2E tests и `npm audit` (0 vulnerabilities) прошли.
 - `npm audit` проверяется отдельно; известные advisories на момент последней проверки были нулевыми.
-- Supabase migration/Edge deployment не выполнялись, потому что требуются Dashboard credentials и явное внешнее действие пользователя.
+- Live OpenRouter inference не выполнялся; новый OpenRouter key и admin allowlist требуют настройки владельцем.
 
 ## Приоритет перед публичным запуском
 
-1. Немедленно отозвать раскрытые bot token и Supabase secret key.
-2. Применить migration, импортировать seed, задать новый BotFather token/session secret/origin и deploy Edge Functions.
-3. Настроить GitHub public Variables, deploy Pages и подключить URL в BotFather.
+1. Отозвать раскрытые bot token, Supabase secret key и OpenRouter key; использовать только новые значения.
+2. Добавить новый BotFather token в Supabase Edge Function Secrets.
+3. Настроить GitHub public Variables и открыть опубликованный Pages URL через Telegram Mini App.
 4. Проверить production Telegram launch, server-side attempt duplicate handling, reset и RLS deny by default.
 5. Добавить rate limits/abuse monitoring и проверенный backup/restore runbook.
 6. При необходимости строгих HTTP security headers перейти на CDN/reverse proxy, который позволяет задать headers.

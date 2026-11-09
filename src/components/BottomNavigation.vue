@@ -1,6 +1,6 @@
 <script setup>
 import { RouterLink, useRoute } from 'vue-router'
-import { BookOpen, Bug, House, MessageCircleQuestion, UserRound } from '@lucide/vue'
+import { BookOpen, Bug, House, MessageCircleQuestion, Trophy, UserRound } from '@lucide/vue'
 
 const route = useRoute()
 const items = [
@@ -8,6 +8,7 @@ const items = [
   { to: '/theory', label: 'Теория', icon: BookOpen },
   { to: '/practice', label: 'Багуля', icon: Bug },
   { to: '/interview', label: 'Интервью', icon: MessageCircleQuestion },
+  { to: '/leaderboard', label: 'Рейтинг', icon: Trophy },
   { to: '/profile', label: 'Профиль', icon: UserRound },
 ]
 </script>

@@ -39,7 +39,7 @@
 - Cloud quiz sessions выбирает и сохраняет сервер; RPC проверяет identity, session membership, correct option ID, текущий UTC Daily и уникальность `(user, session, question)`/`(user, attempt_id)`.
 - RLS включён на user/data таблицах, права `anon`/`authenticated` отозваны; у них нет permissive policies. Только Edge Functions с service role обращаются к RPC, а RPC проверяет ownership аргумента, полученного из session token.
 - Сетевой ответ не начисляется локально до серверного подтверждения. Ограниченный outbox сохраняет только attempt IDs/выбранный option и повторяется при reconnect/возврате вкладки; серверная idempotency сохраняет однократное начисление.
-- OpenRouter API key и admin allowlist читаются только Edge Function. AI tables закрыты RLS и доступны service role; генерация требует проверенного Telegram session и `TELEGRAM_ADMIN_IDS`.
+- OpenRouter API key и admin allowlist читаются только Edge Function. AI tables закрыты RLS и доступны service role; генерация требует проверенного Telegram session и ровно одного валидного `TELEGRAM_ADMIN_IDS`.
 - AI gateway допускает только заранее выбранные exact `:free` модели и перед вызовом проверяет их нулевую prompt/completion цену в каталоге. Provider fallback отключён, при недоступности модели workflow завершается ошибкой без результата.
 - Nemotron получает только формулировку, варианты, категорию и сложность; он самостоятельно возвращает выбранный option ID. Генератору не сообщается, как reviewer ответил, пока blind review не завершён.
 - Сохраняются bounded drafts и события этапов без prompt/API-key logging. До двух revision; публикация доступна только вручную после совпавшего независимого ответа и review approval.
@@ -48,8 +48,8 @@
 
 ## Ограничения и предположения
 
-- GitHub remote подключён; опубликована ветка `main` с одним первоначальным коммитом. `.env.local` исключён из Git и не отслеживается. Предшествующей Git-истории в этом workspace нет; отдельно проверьте GitHub Secret scanning после включения функции. Ранее раскрытые в переписке credentials всё равно нужно отозвать, даже если их нет в репозитории.
-- Подготовленные Supabase migration/functions не применены к проекту до действий владельца; настоящее cloud behavior начнёт работать только после deploy, secrets, seed и GitHub public variables. Локальный режим остаётся изменяемым пользователем.
+- GitHub remote подключён, ветка `main` опубликована. `.env.local` исключён из Git и не отслеживается. Историю до создания локального репозитория проверить нельзя; отдельно проверьте GitHub Secret scanning. Ранее раскрытые в переписке credentials всё равно нужно отозвать, даже если их нет в репозитории.
+- Supabase base/AI schema, seed и три Edge Functions развёрнуты; новая leaderboard migration пока находится в исходниках и должна быть применена до обновления `quiz-api`. Рейтинг opt-in и показывает только выбранные псевдонимы. Локальный режим остаётся изменяемым пользователем.
 - Telegram initData является подписанным bearer payload и может быть повторно использован до истечения freshness window. Повторный launch/reload Mini App штатно может вернуть тот же payload, поэтому одноразовый nonce не включён. Повторные игровые награды защищены отдельной server-side уникальностью.
 - Короткоживущий HMAC bearer token можно повторить до `exp`, если он украден из памяти работающего процесса. Он не сохраняется в localStorage/sessionStorage. Для quiz API отдельное rate limiting и token revocation не настроены; AI generation ограничена пятью запросами в час на allowlisted admin ID.
 - Cloud score подтверждается сервером, но вопросы и часть локальной практики остаются загруженными в клиент; нельзя предотвратить автоматизированный просмотр контента.

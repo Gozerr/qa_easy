@@ -4,6 +4,13 @@ export const REVIEWER_MODEL = 'nvidia/nemotron-3.5-super-vl:free'
 const CATEGORIES = new Set(['fundamentals', 'web-api', 'scenarios'])
 const DIFFICULTIES = new Set(['Начальный', 'Средний', 'Сложный'])
 const SAFE_ID = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}$/
+const TELEGRAM_USER_ID = /^[1-9][0-9]{0,15}$/
+
+export function isSoleAdmin(configuredIds: string | undefined, telegramUserId: string) {
+  if (!TELEGRAM_USER_ID.test(telegramUserId)) return false
+  const ids = (configuredIds ?? '').split(',').map((id) => id.trim()).filter(Boolean)
+  return ids.length === 1 && TELEGRAM_USER_ID.test(ids[0]) && ids[0] === telegramUserId
+}
 
 export function isZeroPricedModel(model: unknown, expectedId: string) {
   if (!model || typeof model !== 'object') return false

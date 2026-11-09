@@ -5,6 +5,7 @@ const QUESTION_ID = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}$/
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 const CATEGORIES = new Set(['fundamentals', 'web-api', 'scenarios'])
 const DIFFICULTIES = new Set(['Начальный', 'Средний', 'Сложный'])
+const LEADERBOARD_NAME = /^[\p{L}\p{N}][\p{L}\p{N} _-]{1,23}$/u
 
 function randomBelow(maximum: number): number {
   const range = 0x1_0000_0000
@@ -171,6 +172,41 @@ Deno.serve(async (request: Request) => {
       const { data, error } = await client.rpc('get_user_stats', { p_telegram_user_id: telegramUserId })
       if (error || !data) throw new Error('Progress retrieval failed')
       return jsonResponse(request, { progress: data })
+    }
+    if (body.action === 'get_leaderboard') {
+      const { data: profile, error: profileError } = await client.from('profiles')
+        .select('leaderboard_enabled,leaderboard_name')
+        .eq('telegram_user_id', telegramUserId)
+        .single()
+      if (profileError || !profile) throw new Error('Leaderboard preferences unavailable')
+      const { data, error } = await client.rpc('get_public_leaderboard', {
+        p_telegram_user_id: telegramUserId,
+        p_limit: 50,
+      })
+      if (error || !data) throw new Error('Leaderboard retrieval failed')
+      return jsonResponse(request, {
+        ...data,
+        preferences: { enabled: profile.leaderboard_enabled, displayName: profile.leaderboard_name ?? '' },
+      })
+    }
+    if (body.action === 'update_leaderboard') {
+      if (typeof body.enabled !== 'boolean') return jsonResponse(request, { error: 'Некорректные настройки рейтинга.' }, 400)
+      const displayName = typeof body.displayName === 'string' ? body.displayName.trim() : ''
+      if (body.enabled && !LEADERBOARD_NAME.test(displayName)) {
+        return jsonResponse(request, { error: 'Псевдоним должен содержать 2–24 буквы, цифры, пробелы или дефисы.' }, 400)
+      }
+      if (displayName && !LEADERBOARD_NAME.test(displayName)) {
+        return jsonResponse(request, { error: 'Псевдоним содержит недопустимые символы.' }, 400)
+      }
+      const { data, error } = await client.from('profiles')
+        .update({ leaderboard_enabled: body.enabled, leaderboard_name: displayName || null })
+        .eq('telegram_user_id', telegramUserId)
+        .select('leaderboard_enabled,leaderboard_name')
+        .single()
+      if (error || !data) throw new Error('Leaderboard preferences update failed')
+      return jsonResponse(request, {
+        preferences: { enabled: data.leaderboard_enabled, displayName: data.leaderboard_name ?? '' },
+      })
     }
     if (body.action === 'reset_progress') {
       const { error } = await client.rpc('reset_user_progress', { p_telegram_user_id: telegramUserId })
