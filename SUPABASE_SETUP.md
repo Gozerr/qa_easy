@@ -2,7 +2,7 @@
 
 ## Текущее состояние
 
-Клиент, migration, повторяемый seed и две Edge Functions подготовлены. Supabase CLI/SQL migrations и функции в существующий проект отсюда не применялись: в workspace нет Supabase CLI, Deno, Git remote и подтверждённой сессии Dashboard. До завершения шагов ниже Telegram cloud mode не активен. Обычный браузер продолжает работать в локальном режиме.
+Клиент, migration, повторяемый seed и три Edge Functions подготовлены. GitHub remote подключён и первоначальный commit опубликован в `main`. Supabase migration, seed и функции ещё не применялись к проекту; до завершения шагов ниже Telegram cloud mode не активен. Обычный браузер продолжает работать в локальном режиме.
 
 Не используйте ключ с префиксом `sb_secret_` в клиенте или GitHub Variables. Он не является Project URL. Этот ключ и отправленный в чат токен бота нужно немедленно отозвать/перевыпустить в соответствующих Dashboard, так как они были раскрыты вне secret store. В проекте эти значения не добавлены.
 
@@ -112,7 +112,7 @@ npx supabase functions deploy ai-admin --no-verify-jwt
 4. Откройте app в Telegram на iOS/Android/Desktop. Проверьте light/dark theme, safe area, viewport, BackButton, ежедневную задачу и одну server-scored попытку.
 5. Проверьте Supabase **Edge Function Logs** и **Table Editor**: не должно быть `initData`, bot token или session token в logs; должны появиться profile, quiz session, attempt и progress.
 
-Нельзя подтвердить production до того, как этот пользователь сам создаст commit/push и workflow завершится успешно. В текущем workspace git metadata нет; push не выполнялся.
+Публикация исходного кода в GitHub выполнена. Production deployment ещё не подтверждён: проверьте успешный Pages workflow в **Actions** и фактический URL в environment `github-pages`. Cloud mode дополнительно требует применённой migration, seed, Edge Function secrets и deployment трёх функций.
 
 ## 10. Резервное копирование и восстановление
 
@@ -126,8 +126,7 @@ npx supabase functions deploy ai-admin --no-verify-jwt
 1. Отозвать скомпрометированный bot token и Supabase secret key; не менять publishable key только из-за публичного назначения, но проверить настройки проекта.
 2. Войти в Supabase CLI, связать локальную папку с проектом и применить миграцию после dry-run.
 3. Выполнить `npm run supabase:seed`, применить `supabase/seed.sql` в SQL Editor и проверить counts.
-6. Задать Edge Function secrets, allowed origin, новый OpenRouter key и `TELEGRAM_ADMIN_IDS` в Supabase Dashboard.
-7. Развернуть три Edge Functions и проверить их логи без записи token/prompt.
-6. Добавить две Supabase public Variables в GitHub Actions settings.
-7. Создать commit/push в существующую GitHub-репозиторию и дождаться Pages deployment.
-8. Назначить фактический HTTPS URL в BotFather и проверить Mini App на реальном Telegram client.
+4. Задать Edge Function secrets, allowed origin, новый OpenRouter key и `TELEGRAM_ADMIN_IDS` в Supabase Dashboard.
+5. Развернуть три Edge Functions и проверить их логи без записи token/prompt.
+6. Добавить две Supabase public Variables в GitHub Actions settings и проверить Pages deployment.
+7. Назначить фактический HTTPS URL в BotFather и проверить Mini App на реальном Telegram client.

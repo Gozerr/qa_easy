@@ -1,6 +1,6 @@
 # Отчёт аудита безопасности
 
-**Область:** текущий статический Vue/Vite workspace, Supabase migrations и Edge Function source, OpenRouter gateway, GitHub Actions, client storage и quiz logic. **Дата проверки:** 9 ноября 2026. **Важно:** remote Supabase и GitHub не подключались, миграции/функции не развертывались; live OpenRouter inference не выполнялся.
+**Область:** текущий статический Vue/Vite workspace, Supabase migrations и Edge Function source, OpenRouter gateway, GitHub Actions, client storage и quiz logic. **Дата проверки:** 9 ноября 2026. **Важно:** GitHub remote подключён, первоначальный commit опубликован в `main`; production workflow ещё требует проверки. Supabase migrations/functions не развертывались; live OpenRouter inference не выполнялся.
 
 ## Краткий риск-статус
 
@@ -62,11 +62,11 @@
 - **Решение:** CSP/referrer meta, локальный font stack, ограниченный script/connect source list и pinned action SHAs.
 - **Остаток:** CSP meta не может выставить `frame-ancestors`, HSTS, `X-Content-Type-Options` и прочие HTTP headers. `style-src 'unsafe-inline'` разрешён для Vue dynamic style; Telegram CDN оставлен доверенным runtime script.
 
-### SEC-06 — Git history и remote невозможно проверить
+### SEC-06 — Ограниченная проверка Git history
 
-- **Критичность:** неизвестно.
-- **Факт:** `g:\qa_easy\.git` отсутствует, поэтому secret scanning и author/remotes audit по Git history невозможны.
-- **Действие:** после создания/привязки repository выполните GitHub secret scanning и проверьте историю. Если credentials когда-либо попадали в историю, удаление commit не заменяет rotation.
+- **Критичность:** низкая для текущего содержимого; ранее раскрытые credentials требуют отдельной ротации.
+- **Факт:** remote `https://github.com/Gozerr/qa_easy.git` подключён, опубликована ветка `main` с одним первоначальным коммитом. `.env.local` и `.env` не отслеживаются Git. Предшествующей истории в локальном репозитории нет.
+- **Действие:** проверьте GitHub Secret scanning после включения функции. Если credentials когда-либо попадали в опубликованную историю, удаление commit не заменяет rotation.
 
 ## Исправления и тестовые доказательства
 

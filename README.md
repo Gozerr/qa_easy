@@ -61,22 +61,20 @@ Unit-тесты проверяют Fisher–Yates, ID-ответы, schema ва�
 
 ## GitHub Pages
 
-В workspace нет `.git`, remote или локальной default branch. Пользователь предоставил существующий remote `https://github.com/Gozerr/qa_easy.git`, но push не выполнялся. Workflow берёт repository name/default branch из GitHub Actions, выставляет Vite base для GitHub Pages и публикует только default branch; третьи-party Actions закреплены по commit SHA. Проверки запускаются для push/PR, публикация не запускается из PR.
+Репозиторий опубликован на GitHub: `https://github.com/Gozerr/qa_easy`, ветка `main`. Workflow берёт repository name/default branch из GitHub Actions, выставляет Vite base для GitHub Pages и публикует только default branch; third-party Actions закреплены по commit SHA. Проверки запускаются для push/PR, публикация не запускается из PR.
 
-1. В терминале VS Code откройте `g:\qa_easy`, проверьте `git status` и создайте первый commit.
+Чтобы отправить последующие изменения:
 
    ```sh
-   git add .
-   git commit -m "Создать QA на пальцах"
-   git remote add origin https://github.com/Gozerr/qa_easy.git
-   git push -u origin <ИМЯ_ВЕТКИ>
+   git status
+   git add <изменённые-файлы>
+   git commit -m "Краткое описание изменений"
+   git push
    ```
 
-2. Если remote ещё не добавлен, выполните `git remote add origin https://github.com/Gozerr/qa_easy.git`; затем отправьте commit в существующую default branch.
-3. Если default branch в GitHub отличается от ветки, которую вы отправили, назначьте нужную ветку default: **Settings → General → Default branch → Edit**. Workflow проверяет значение GitHub, поэтому имя ветки в YAML менять не нужно.
-4. Откройте **Settings → Pages**, в разделе **Build and deployment** выберите **Source: GitHub Actions**.
-5. Если включаете Supabase, добавьте только публичные repository Variables `VITE_SUPABASE_URL` и `VITE_SUPABASE_PUBLISHABLE_KEY` в **Settings → Secrets and variables → Actions → Variables**.
-6. Откройте вкладку **Actions** и дождитесь успешного workflow **Проверка и публикация** на default branch. Только после этого GitHub покажет фактический адрес страницы в окружении `github-pages`.
+Workflow выполняет проверки для push и pull request в `main`. Для первой публикации откройте **Settings → Pages** и выберите **Source: GitHub Actions**. Публикация запускается только для default branch; её фактический адрес появится в environment `github-pages` после успешного workflow **Проверка и публикация**.
+
+Если включаете Supabase, добавьте только публичные repository Variables `VITE_SUPABASE_URL` и `VITE_SUPABASE_PUBLISHABLE_KEY` в **Settings → Secrets and variables → Actions → Variables**.
 
 ### Если публикация не прошла
 
