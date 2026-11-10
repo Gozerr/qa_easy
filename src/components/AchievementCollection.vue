@@ -30,7 +30,7 @@ function formattedDate(value) {
       <div class="achievement-copy">
         <div class="achievement-title"><strong>{{ achievement.title }}</strong><span class="achievement-rarity">{{ achievement.rarity }}</span></div>
         <small>{{ achievement.description }}</small>
-        <div class="achievement-progress-copy"><span>{{ achievement.earned ? `Открыто · ${formattedDate(achievement.earnedAt)}` : `${achievement.current.toLocaleString('ru-RU')} / ${achievement.target.toLocaleString('ru-RU')}` }}</span><span>{{ achievement.earned ? '100' : achievement.percent }}%</span></div>
+        <div class="achievement-progress-copy"><span>{{ achievement.earned ? (achievement.earnedAt ? `Открыто · ${formattedDate(achievement.earnedAt)}` : 'Открыто') : `${achievement.current.toLocaleString('ru-RU')} / ${achievement.target.toLocaleString('ru-RU')}` }}</span><span>{{ achievement.earned ? '100' : achievement.percent }}%</span></div>
         <div class="achievement-progress-track" role="progressbar" :aria-valuenow="achievement.earned ? 100 : achievement.percent" aria-valuemin="0" aria-valuemax="100" :aria-label="`Прогресс: ${achievement.title}`"><span :style="{ width: `${achievement.earned ? 100 : achievement.percent}%` }" /></div>
       </div>
       <span class="achievement-status">{{ achievement.earned ? 'ОТКРЫТО' : 'ЗАКРЫТО' }}</span>

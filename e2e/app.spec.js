@@ -35,6 +35,34 @@ test('коллекция достижений показывает прогре�
   await expect(page.locator('.achievement-row .achievement-progress-track').first()).toHaveAttribute('role', 'progressbar')
 })
 
+test('профиль показывает пять самых недавно полученных достижений', async ({ page }) => {
+  await page.evaluate(() => localStorage.setItem('qa-na-paltsakh:progress', JSON.stringify({
+    version: 4,
+    xp: 500,
+    answeredCount: 25,
+    correctCount: 25,
+    completedQuestionIds: Array.from({ length: 25 }, (_, index) => `qa-${String(index + 1).padStart(2, '0')}`),
+    dailyCompletions: [],
+    activeSessions: {},
+    pendingCloudAttempts: [],
+    completedLessonIds: [],
+    achievementDates: {
+      'first-answer': '2025-01-01T00:00:00.000Z',
+      'first-correct': '2025-01-02T00:00:00.000Z',
+      'ten-answers': '2025-01-03T00:00:00.000Z',
+      'twenty-five-answers': '2025-01-04T00:00:00.000Z',
+      'ten-correct': '2025-01-05T00:00:00.000Z',
+      'twenty-five-correct': '2025-01-06T00:00:00.000Z',
+    },
+    theme: 'light',
+  })))
+  await page.reload()
+  await page.getByRole('link', { name: 'Профиль', exact: true }).click()
+  await expect(page.locator('.achievement-row')).toHaveCount(5)
+  await expect(page.locator('.achievement-row').first()).toContainText('Верная стратегия')
+  await expect(page.locator('.achievement-row').last()).not.toContainText('Первый шаг')
+})
+
 test('собеседование переключает набор, а теория открывает фильтрованный материал', async ({ page }) => {
   await page.goto('interview')
   await expect(page.getByText('18 вопросов')).toBeVisible()

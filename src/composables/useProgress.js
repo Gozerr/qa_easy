@@ -79,12 +79,13 @@ const achievements = computed(() => {
   ].map((item) => ({ ...item, earnedAt: progress.achievementDates[item.id] ?? null }))
 })
 
-watch(achievements, (items) => {
+watch(achievements, (items, previousItems) => {
+  const previouslyEarned = new Set((previousItems ?? []).filter(({ earned }) => earned).map(({ id }) => id))
   const earnedAt = new Date().toISOString()
   for (const item of items) {
-    if (item.earned && !progress.achievementDates[item.id]) progress.achievementDates[item.id] = earnedAt
+    if (item.earned && !previouslyEarned.has(item.id) && !progress.achievementDates[item.id]) progress.achievementDates[item.id] = earnedAt
   }
-}, { immediate: true })
+})
 
 function markLessonComplete(lessonId) {
   if (typeof lessonId !== 'string' || !SAFE_LESSON_ID.test(lessonId)) return false
