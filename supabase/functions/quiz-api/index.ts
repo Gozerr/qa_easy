@@ -138,6 +138,7 @@ async function createQuizSession(client: ReturnType<typeof createServiceClient>,
     p_session_id: sessionId,
     p_question_ids: questionIds,
   })
+  if (sessionError?.message === 'Quiz session rate limit exceeded') return { rateLimited: true as const }
   if (sessionError) throw new Error('Quiz session persistence failed')
 
   return {
@@ -172,7 +173,11 @@ Deno.serve(async (request: Request) => {
     }
 
     const client = createServiceClient()
-    if (body.action === 'create_session') return jsonResponse(request, await createQuizSession(client, telegramUserId, body))
+    if (body.action === 'create_session') {
+      const result = await createQuizSession(client, telegramUserId, body)
+      if ('rateLimited' in result) return jsonResponse(request, { error: 'Слишком много запусков. Попробуйте снова через минуту.' }, 429)
+      return jsonResponse(request, result)
+    }
     if (body.action === 'get_questions') return jsonResponse(request, await getQuestions(client, body))
     if (body.action === 'get_daily') return jsonResponse(request, await getDailyTask(client))
     if (body.action === 'get_progress') {

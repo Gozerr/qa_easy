@@ -7,6 +7,7 @@ const MAX_COUNTER = 1_000_000_000
 const SAFE_ID = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}$/
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 const LEADERBOARD_NAME = /^[\p{L}\p{N}][\p{L}\p{N} _-]{1,23}$/u
+const SESSION_RATE_LIMIT_MESSAGE = 'Слишком много запусков. Попробуйте снова через минуту.'
 
 export const cloudStatus = ref(isSupabaseConfigured ? 'browser' : 'unconfigured')
 export const cloudError = ref('')
@@ -164,8 +165,9 @@ async function invokeAuthenticated(body, functionName = 'quiz-api') {
     })
     if (error || !data || typeof data !== 'object') throw invokeFailure()
     return data
-  } catch {
+  } catch (error) {
     cloudError.value = 'Синхронизация временно недоступна. Попробуйте отправить ответ ещё раз.'
+    if (error?.context?.status === 429) throw new Error(SESSION_RATE_LIMIT_MESSAGE)
     throw invokeFailure()
   }
 }

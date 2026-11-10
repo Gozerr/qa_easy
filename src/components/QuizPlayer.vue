@@ -45,8 +45,10 @@ async function start() {
   submitting.value = true
   try {
     await beginSession(props.mode, props.pool, props.size, props.dailyDate)
-  } catch {
-    submissionError.value = 'Не удалось подготовить тренировку. Проверьте соединение и повторите попытку.'
+  } catch (error) {
+    submissionError.value = error?.message === 'Слишком много запусков. Попробуйте снова через минуту.'
+      ? error.message
+      : 'Не удалось подготовить тренировку. Проверьте соединение и повторите попытку.'
   } finally {
     submitting.value = false
   }
