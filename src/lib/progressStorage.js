@@ -1,8 +1,9 @@
 import { createId } from './quizEngine.js'
 import { qaProjects } from '../data/qaProjects.js'
+import { validateDailyChallenge } from './dailyChallenge.js'
 
 export const STORAGE_KEY = 'qa-na-paltsakh:progress'
-export const STORAGE_VERSION = 9
+export const STORAGE_VERSION = 10
 
 const MAX_STORAGE_CHARS = 256_000
 const MAX_COUNT = 1_000_000_000
@@ -42,6 +43,7 @@ export function createInitialProgress() {
     practiceResults: {},
     seasonalResults: {},
     projectProgress: {},
+    dailyChallenges: {},
     lessonPractices: {},
     xpTransactions: [],
     theme: 'system',
@@ -57,7 +59,7 @@ function browserStorage() {
 }
 
 function normalizeProgress(value) {
-  if (!value || ![1, 2, 3, 4, 5, 6, 7, 8, STORAGE_VERSION].includes(value.version)) return null
+  if (!value || ![1, 2, 3, 4, 5, 6, 7, 8, 9, STORAGE_VERSION].includes(value.version)) return null
   const migrating = value.version < STORAGE_VERSION
   if (!Number.isSafeInteger(value.xp) || !Number.isSafeInteger(value.answeredCount) || !Number.isSafeInteger(value.correctCount)) return null
   if (value.xp < 0 || value.answeredCount < 0 || value.correctCount < 0 || value.correctCount > value.answeredCount) return null
@@ -75,6 +77,7 @@ function normalizeProgress(value) {
   if (value.practiceResults && (typeof value.practiceResults !== 'object' || Array.isArray(value.practiceResults) || Object.keys(value.practiceResults).length > 1_000)) return null
   if (value.seasonalResults && (typeof value.seasonalResults !== 'object' || Array.isArray(value.seasonalResults) || Object.keys(value.seasonalResults).length > 120)) return null
   if (value.projectProgress && (typeof value.projectProgress !== 'object' || Array.isArray(value.projectProgress) || Object.keys(value.projectProgress).length > 20)) return null
+  if (value.dailyChallenges && (typeof value.dailyChallenges !== 'object' || Array.isArray(value.dailyChallenges) || Object.keys(value.dailyChallenges).length > MAX_DAILY_COMPLETIONS)) return null
   if (value.version === STORAGE_VERSION && (!value.lessonPractices || typeof value.lessonPractices !== 'object' || Array.isArray(value.lessonPractices))) return null
   if (value.lessonPractices && (typeof value.lessonPractices !== 'object' || Array.isArray(value.lessonPractices) || Object.keys(value.lessonPractices).length > 1_000)) return null
   if (value.version === STORAGE_VERSION && (!Array.isArray(value.xpTransactions) || value.xpTransactions.length > MAX_XP_TRANSACTIONS)) return null
@@ -182,6 +185,11 @@ function normalizeProgress(value) {
         completedAt: validDate ? entry.completedAt : null,
       }]]
     })),
+    dailyChallenges: Object.fromEntries(Object.entries(value.dailyChallenges ?? {}).flatMap(([date, record]) => {
+      if (!isUtcDate(date) || !record || typeof record !== 'object' || !isIsoTimestamp(record.completedAt)) return []
+      const response = validateDailyChallenge(record.activityType, record.response)
+      return response ? [[date, { activityType: record.activityType, response, completedAt: record.completedAt }]] : []
+    }).slice(-90)),
     lessonPractices: Object.fromEntries(Object.entries(value.lessonPractices ?? {}).flatMap(([id, result]) => {
       if (!SAFE_ID.test(id) || !result || typeof result !== 'object' || !isIsoTimestamp(result.completedAt)) return []
       const scenario = typeof result.scenario === 'string' ? result.scenario.trim().slice(0, 1_500) : ''

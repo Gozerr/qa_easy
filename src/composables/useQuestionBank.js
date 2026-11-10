@@ -14,13 +14,13 @@ export function useQuestionBank() {
   }
 
   function getDaily(date) {
+    const localTask = getDailyTask(date, localDailyTasks)
     const remote = cloudDailyTask.value
     if (cloudStatus.value === 'ready' && remote?.date === date && remote.content?.questionId) {
       const question = getQuestion(remote.content.questionId)
-      if (question) return { id: remote.id, title: remote.title, prompt: remote.description, questionId: question.id, question }
+      if (question) return { id: remote.id, title: remote.title, prompt: remote.description, questionId: question.id, activityType: remote.id === localTask.id ? localTask.activityType : 'question', question }
     }
-    const task = getDailyTask(date, localDailyTasks)
-    return { ...task, question: getQuestion(task.questionId) }
+    return { ...localTask, question: getQuestion(localTask.questionId) }
   }
 
   return { questions, getQuestion, getDaily }

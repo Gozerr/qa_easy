@@ -38,4 +38,5 @@ export const dailyTasks = taskPrompts.map(([title, prompt], index) => ({
   title,
   prompt,
   questionId: questions[index].id,
+  activityType: ['question', 'test-design', 'bug-report', 'question'][index % 4],
 }))

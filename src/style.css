@@ -349,6 +349,21 @@ button:focus-visible, a:focus-visible, summary:focus-visible { outline: 3px soli
 .daily-prompt { max-width: 590px; margin: 8px 0 18px; color: var(--muted); font-size: 14px; line-height: 1.6; }
 .daily-detail-meta { display: flex; flex-wrap: wrap; gap: 16px; padding-top: 13px; border-top: 1px solid var(--line); }
 .daily-detail-meta span { gap: 6px; color: var(--muted); font-size: 11px; }
+.daily-challenge { margin-top: 0; }
+.daily-challenge-heading { display: flex; align-items: center; gap: 9px; margin-bottom: 10px; }
+.daily-challenge-heading .daily-detail-icon { width: 34px; height: 34px; border-radius: 11px; }
+.daily-challenge-heading .eyebrow { margin: 0; }
+.daily-challenge-instruction { margin: 8px 0 13px; color: var(--muted-strong); font-size: 11px; line-height: 1.55; }
+.daily-test-case { display: grid; gap: 9px; margin-top: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 13px; background: var(--surface-secondary); }
+.daily-test-case > strong { font-size: 11px; }
+.daily-test-case label, .daily-report-fields label { display: grid; min-width: 0; gap: 5px; color: var(--muted-strong); font-size: 10px; font-weight: 650; }
+.daily-test-case input, .daily-test-case select, .daily-test-case textarea, .daily-report-fields input, .daily-report-fields select, .daily-report-fields textarea { width: 100%; min-width: 0; min-height: 39px; padding: 8px 9px; border: 1px solid var(--line-strong); border-radius: 9px; color: var(--ink); background: var(--page-bg); font: inherit; font-size: 11px; line-height: 1.45; }
+.daily-test-case textarea, .daily-report-fields textarea { resize: vertical; }
+.daily-report-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.daily-challenge-rubric, .daily-challenge-local-note, .daily-challenge-saved { margin: 9px 0 0; color: var(--muted); font-size: 9px; line-height: 1.5; }
+.daily-challenge-saved { color: var(--success); }
+.daily-challenge-local-note { padding-top: 8px; border-top: 1px solid var(--line); }
+.daily-challenge .activity-actions button:disabled { opacity: .45; cursor: not-allowed; }
 .daily-expectation { margin: 15px 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
 
 .profile-scoreboard { overflow: hidden; border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--surface); box-shadow: var(--shadow-card); }
@@ -771,6 +786,7 @@ button:focus-visible, a:focus-visible, summary:focus-visible { outline: 3px soli
   .lab-panel { padding: 12px; }
   .activity-card { padding: 13px; }
   .case-form, .bug-report-form { grid-template-columns: 1fr; }
+  .daily-report-fields { grid-template-columns: 1fr; }
   .case-expected, .case-form > .button { grid-column: auto; }
 }
 .course-module { transition: background-color 150ms ease; }

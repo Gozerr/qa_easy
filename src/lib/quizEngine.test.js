@@ -50,7 +50,8 @@ describe('quiz engine', () => {
   it('ships 30 distinct daily tasks linked to valid questions', () => {
     expect(dailyTasks).toHaveLength(30)
     expect(new Set(dailyTasks.map(({ id }) => id)).size).toBe(30)
-    expect(dailyTasks.every(({ title, prompt, questionId }) => title && prompt && questions.some(({ id }) => id === questionId))).toBe(true)
+    expect(dailyTasks.every(({ title, prompt, questionId, activityType }) => title && prompt && ['question', 'test-design', 'bug-report'].includes(activityType) && questions.some(({ id }) => id === questionId))).toBe(true)
+    expect(new Set(dailyTasks.map(({ activityType }) => activityType))).toEqual(new Set(['question', 'test-design', 'bug-report']))
   })
 
   it('provides lesson material needed for a practical task in all 50 lessons', () => {
@@ -125,7 +126,7 @@ describe('quiz engine', () => {
     }))
     const migrated = loadProgress(storage)
     expect(migrated.recovered).toBe(false)
-    expect(migrated.progress.version).toBe(9)
+    expect(migrated.progress.version).toBe(10)
     expect(migrated.progress.activeSessions.practice.sessionId).toBeTruthy()
     expect(loadProgress(storage).progress.activeSessions.practice.questionIds).toEqual(['qa-01'])
 
@@ -145,7 +146,7 @@ describe('quiz engine', () => {
 
     const migrated = loadProgress(storage)
     expect(migrated.recovered).toBe(false)
-    expect(migrated.progress.version).toBe(9)
+    expect(migrated.progress.version).toBe(10)
     expect(migrated.progress.xp).toBe(150)
     expect(migrated.progress.completedLessonIds).toEqual(['basics-qa', 'sql-model'])
     expect(migrated.progress.achievementDates).toEqual({})
@@ -182,7 +183,7 @@ describe('quiz engine', () => {
     }))
     const migrated = loadProgress(storage)
     expect(migrated.recovered).toBe(false)
-    expect(migrated.progress.version).toBe(9)
+    expect(migrated.progress.version).toBe(10)
     expect(migrated.progress.seasonalResults).toEqual({
       '2026-11': {
         'arena-scenarios': { bestScore: 80, completedAt: '2026-11-10T10:00:00.000Z' },
@@ -191,10 +192,10 @@ describe('quiz engine', () => {
     })
   })
 
-  it('preserves project answers and best scores when migrating schema v8', () => {
+  it('preserves project answers and best scores when migrating schema v9', () => {
     const storage = memoryStorage(JSON.stringify({
       ...createInitialProgress(),
-      version: 8,
+      version: 9,
       projectProgress: {
         'idor-security': {
           answers: { 'trust-boundary': 'server-owner', coverage: 'access-matrix', denial: 'deny-no-data', evidence: 'synthetic-proof' },
@@ -205,12 +206,35 @@ describe('quiz engine', () => {
     }))
     const migrated = loadProgress(storage)
     expect(migrated.recovered).toBe(false)
-    expect(migrated.progress.version).toBe(9)
+    expect(migrated.progress.version).toBe(10)
     expect(migrated.progress.projectProgress['idor-security']).toEqual({
       answers: { 'trust-boundary': 'server-owner', coverage: 'access-matrix', denial: 'deny-no-data', evidence: 'synthetic-proof' },
       bestScore: 100,
       completedAt: '2026-11-10T10:00:00.000Z',
     })
+  })
+
+  it('round-trips validated local daily challenge deliverables', () => {
+    const progress = {
+      ...createInitialProgress(),
+      dailyCompletions: ['2026-11-10'],
+      dailyChallenges: {
+        '2026-11-10': {
+          activityType: 'test-design',
+          response: { cases: [
+            { type: 'positive', condition: 'Use a valid record', expected: 'One record is saved' },
+            { type: 'negative', condition: 'Use an empty required field', expected: 'The request is rejected' },
+          ] },
+          completedAt: '2026-11-10T10:00:00.000Z',
+        },
+      },
+    }
+    const storage = memoryStorage()
+    expect(saveProgress(progress, storage)).toBe(true)
+    expect(loadProgress(storage).progress.dailyChallenges).toEqual(progress.dailyChallenges)
+
+    const malformed = { ...progress, dailyChallenges: { ...progress.dailyChallenges, '2026-11-11': { activityType: 'bug-report', response: {}, completedAt: '2026-11-11T10:00:00.000Z' } } }
+    expect(loadProgress(memoryStorage(JSON.stringify(malformed))).progress.dailyChallenges).toEqual(progress.dailyChallenges)
   })
 
   it('keeps bounded, validated XP transactions during local storage round trips', () => {

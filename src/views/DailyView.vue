@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { CalendarCheck, Check, Clock3, Globe2 } from '@lucide/vue'
 import PageHeading from '../components/PageHeading.vue'
 import QuizPlayer from '../components/QuizPlayer.vue'
+import DailyChallenge from '../components/DailyChallenge.vue'
 import WeeklyMissionsPanel from '../components/WeeklyMissionsPanel.vue'
 import { useUtcDate } from '../composables/useUtcDate.js'
 import { useProgress } from '../composables/useProgress.js'
@@ -13,7 +14,7 @@ const { getDaily } = useQuestionBank()
 const task = computed(() => getDaily(date.value))
 const question = computed(() => task.value.question)
 const { progress } = useProgress()
-const done = computed(() => progress.dailyCompletions.includes(date.value))
+const done = computed(() => progress.dailyCompletions.includes(date.value) || Boolean(progress.dailyChallenges[date.value]?.completedAt))
 const dateLabel = computed(() => new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(`${date.value}T00:00:00Z`)))
 </script>
 
@@ -21,7 +22,7 @@ const dateLabel = computed(() => new Intl.DateTimeFormat('ru-RU', { day: 'numeri
   <div class="page">
     <PageHeading eyebrow="ОДНА ЗАДАЧА · КАЖДЫЙ ДЕНЬ" title="QA Daily" description="Короткая практика, чтобы QA-мышца не засыпала." />
 
-    <section class="daily-detail">
+    <section class="daily-detail" :data-activity-type="task.activityType">
       <div class="daily-detail-top">
         <span class="daily-detail-icon"><CalendarCheck :size="20" aria-hidden="true" /></span>
         <span class="daily-state" :class="{ 'is-done': done }">
@@ -34,8 +35,9 @@ const dateLabel = computed(() => new Intl.DateTimeFormat('ru-RU', { day: 'numeri
       <div class="daily-detail-meta"><span><Clock3 :size="15" aria-hidden="true" /> 2 минуты</span><span><Globe2 :size="15" aria-hidden="true" /> Одинаково для всех</span></div>
     </section>
 
-    <p class="daily-expectation">Сначала выбери вариант, затем открой разбор. Задание меняется в 00:00 UTC.</p>
-    <QuizPlayer :mode="`daily-${date}`" :pool="[question]" :size="1" :daily-date="date" start-label="Взяться за задачу" />
+    <p class="daily-expectation">{{ task.activityType === 'question' ? 'Сначала выбери вариант, затем открой разбор.' : 'Выполни практическое задание и сохрани ответ на устройстве.' }} Задание меняется в 00:00 UTC.</p>
+    <QuizPlayer v-if="task.activityType === 'question'" :mode="`daily-${date}`" :pool="[question]" :size="1" :daily-date="date" start-label="Взяться за задачу" />
+    <DailyChallenge v-else :key="`${date}-${task.activityType}`" :task="task" :date="date" />
     <WeeklyMissionsPanel :today="date" />
   </div>
 </template>

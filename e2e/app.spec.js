@@ -12,21 +12,80 @@ test('QA Daily сохраняет ответ и отмечает выполне�
   await expect(page.getByRole('heading', { name: 'Миссии недели' })).toBeVisible()
   await expect(page.locator('.activity-calendar-day')).toHaveCount(7)
   await expect(page.locator('.weekly-missions-gate')).toContainText('доступны в подтверждённой сессии Telegram')
-  await page.getByRole('button', { name: 'Взяться за задачу' }).click()
-  await page.locator('.answer-option').first().click()
-  await page.getByRole('button', { name: 'Проверить ответ' }).click()
-  await expect(page.locator('.feedback-box')).toBeVisible()
-  await page.getByRole('button', { name: 'К результатам' }).click()
-  await expect(page.locator('.result-state h2')).toHaveText(/\d из 1 верно/)
+  const activityType = await page.locator('.daily-detail').getAttribute('data-activity-type')
+  if (activityType === 'question') {
+    await page.getByRole('button', { name: 'Взяться за задачу' }).click()
+    await page.locator('.answer-option').first().click()
+    await page.getByRole('button', { name: 'Проверить ответ' }).click()
+    await expect(page.locator('.feedback-box')).toBeVisible()
+    await page.getByRole('button', { name: 'К результатам' }).click()
+    await expect(page.locator('.result-state h2')).toHaveText(/\d из 1 верно/)
+  } else if (activityType === 'test-design') {
+    await page.getByLabel('Условие кейса 1').fill('Отправить форму с корректными тестовыми данными')
+    await page.getByLabel('Ожидаемый результат кейса 1').fill('Сервис сохраняет один корректный результат')
+    await page.getByLabel('Условие кейса 2').fill('Отправить пустое обязательное значение')
+    await page.getByLabel('Ожидаемый результат кейса 2').fill('Сервис отклоняет запрос и сохраняет состояние')
+    await page.getByRole('button', { name: 'Сохранить задание' }).click()
+    await expect(page.locator('.daily-challenge-saved')).toBeVisible()
+  } else {
+    await page.getByLabel('Заголовок').fill('API: повторный запрос сохраняет некорректное состояние')
+    await page.getByLabel('Окружение').fill('Android, Telegram Mini App, QA')
+    await page.getByLabel('Предусловия').fill('Есть тестовый пользователь и подготовленный объект')
+    await page.getByLabel('Шаги · каждый с новой строки').fill('Подготовить тестовые данные\nВыполнить описанное действие\nПроверить ответ и состояние')
+    await page.getByLabel('Фактический результат').fill('Система сохраняет неожиданный результат')
+    await page.getByLabel('Ожидаемый результат').fill('Система отклоняет операцию и оставляет состояние прежним')
+    await page.getByLabel('Серьёзность').selectOption('Высокая')
+    await page.getByLabel('Приоритет').selectOption('Высокий')
+    await page.getByRole('button', { name: 'Сохранить задание' }).click()
+    await expect(page.locator('.daily-challenge-saved')).toBeVisible()
+  }
 
   await page.reload()
-  await expect(page.locator('.result-state')).toBeVisible()
+  if (activityType === 'question') await expect(page.locator('.result-state')).toBeVisible()
+  else await expect(page.locator('.daily-challenge-saved')).toBeVisible()
   await page.getByRole('link', { name: 'Профиль', exact: true }).click()
   await expect(page.locator('.profile-daily-count strong')).toHaveText('1')
   await expect(page.locator('.xp-mark')).not.toHaveText(/^\s*0 XP$/)
   await page.getByRole('link', { name: /История XP и наград/ }).click()
   await expect(page.getByRole('heading', { name: 'Опыт и награды' })).toBeVisible()
-  await expect(page.locator('.xp-history-item')).toHaveCount(1)
+  await expect(page.locator('.xp-history-item')).toHaveCount(activityType === 'question' ? 1 : 0)
+})
+
+test('QA Daily чередует викторину, конструктор тестов и баг-репорт по UTC', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-11-10T12:00:00.000Z') })
+  const activities = [
+    ['2026-11-10', 'question'],
+    ['2026-11-12', 'test-design'],
+    ['2026-11-13', 'bug-report'],
+  ]
+  for (const [date, type] of activities) {
+    await page.clock.setFixedTime(new Date(`${date}T12:00:00.000Z`))
+    await page.goto('daily')
+    await expect(page.locator('.daily-detail')).toHaveAttribute('data-activity-type', type)
+    if (type === 'test-design') {
+      await page.getByLabel('Условие кейса 1').fill('Проверить валидный входной объект')
+      await page.getByLabel('Ожидаемый результат кейса 1').fill('Создаётся ровно одна запись')
+      await page.getByLabel('Условие кейса 2').fill('Передать пустое обязательное поле')
+      await page.getByLabel('Ожидаемый результат кейса 2').fill('Запрос отклонён без изменения состояния')
+      await page.getByRole('button', { name: 'Сохранить задание' }).click()
+      await expect(page.locator('.daily-challenge-saved')).toBeVisible()
+    }
+    if (type === 'bug-report') {
+      await page.getByLabel('Заголовок').fill('API: повторный запрос создаёт побочный эффект')
+      await page.getByLabel('Окружение').fill('iOS 18, Telegram Mini App, QA')
+      await page.getByLabel('Предусловия').fill('Подготовлен синтетический пользователь и запись')
+      await page.getByLabel('Шаги · каждый с новой строки').fill('Выполнить действие один раз\nПовторить после сетевого сбоя')
+      await page.getByLabel('Фактический результат').fill('Появилось повторное изменение состояния')
+      await page.getByLabel('Ожидаемый результат').fill('Повторный запрос не применяет действие второй раз')
+      await page.getByLabel('Серьёзность').selectOption('Средняя')
+      await page.getByLabel('Приоритет').selectOption('Обычный')
+      await page.getByRole('button', { name: 'Сохранить задание' }).click()
+      await expect(page.locator('.daily-challenge-saved')).toBeVisible()
+    }
+  }
+  await page.reload()
+  await expect(page.locator('.daily-challenge-saved')).toBeVisible()
+  await expect.poll(() => page.evaluate(() => Object.keys(JSON.parse(localStorage.getItem('qa-na-paltsakh:progress')).dailyChallenges).length)).toBe(2)
 })
 
 test('коллекция достижений показывает прогресс и фильтруется по категориям', async ({ page }) => {

@@ -4,6 +4,7 @@ import { createInitialProgress, loadProgress, resetProgress, saveProgress } from
 import { utcDateKey } from '../lib/dailyTask.js'
 import { theoryTopics } from '../data/theory.js'
 import { qaProjects, scoreProject } from '../data/qaProjects.js'
+import { validateDailyChallenge } from '../lib/dailyChallenge.js'
 import { claimCloudWeeklyMission, cloudProfile, cloudStats, cloudStatus, connectTelegram, createCloudQuizSession, fetchArenaLeaderboard as fetchCloudArenaLeaderboard, fetchCloudXpHistory, fetchSkillComparison as fetchCloudSkillComparison, fetchWeeklyMissions, getAuthenticatedTelegramInitData, isServerScoringRequired, resetCloudProgress, saveCloudLessonProgress, serverScoringIsActive, submitCloudArenaResult, submitCloudAttempt } from '../lib/cloudApi.js'
 
 const SAFE_LESSON_ID = /^[a-z0-9][a-z0-9-]{0,79}$/
@@ -191,7 +192,7 @@ function applyServerStats(stats) {
   progress.answeredCount = stats.answeredCount
   progress.correctCount = stats.correctCount
   progress.completedQuestionIds = [...stats.completedQuestionIds]
-  progress.dailyCompletions = [...stats.dailyCompletions]
+  progress.dailyCompletions = [...new Set([...stats.dailyCompletions, ...Object.keys(progress.dailyChallenges)])]
 }
 
 async function syncPendingAttempts() {
@@ -355,6 +356,18 @@ function completeDaily(date = utcDateKey()) {
   if (!progress.dailyCompletions.includes(date)) progress.dailyCompletions.push(date)
 }
 
+function recordDailyChallenge(date, activityType, response) {
+  if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return false
+  const timestamp = Date.parse(`${date}T00:00:00.000Z`)
+  if (!Number.isFinite(timestamp) || new Date(timestamp).toISOString().slice(0, 10) !== date) return false
+  const cleanResponse = validateDailyChallenge(activityType, response)
+  if (!cleanResponse) return false
+  progress.dailyChallenges[date] = { activityType, response: cleanResponse, completedAt: new Date().toISOString() }
+  for (const oldDate of Object.keys(progress.dailyChallenges).sort().slice(0, -90)) delete progress.dailyChallenges[oldDate]
+  completeDaily(date)
+  return true
+}
+
 async function getWeeklyMissions(weekStart) {
   if (!serverScoringIsActive()) return null
   return fetchWeeklyMissions(weekStart)
@@ -423,6 +436,7 @@ export function useProgress() {
     recordLessonPractice,
     recordPracticeResult,
     recordProjectAnswer,
+    recordDailyChallenge,
     clearProgress,
   }
 }
