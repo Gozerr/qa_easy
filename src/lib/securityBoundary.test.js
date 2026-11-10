@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { TelegramAuthError, verifyTelegramInitData } from '../../supabase/functions/_shared/telegramAuth.ts'
 import { issueSessionToken, verifySessionToken } from '../../supabase/functions/_shared/sessionToken.ts'
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 
 const BOT_TOKEN = 'local-test-bot-token-not-a-real-credential'
 const SESSION_SECRET = 'local-only-session-signing-secret-32-bytes-minimum'
@@ -81,5 +81,35 @@ describe('database access boundary', () => {
     expect(migration).not.toMatch(/using\s*\(\s*true\s*\)/i)
     expect(migration).toContain('unique (telegram_user_id, session_id, question_id)')
     expect(migration).toContain('unique (telegram_user_id, attempt_id)')
+  })
+
+  it('keeps RLS on every application table and revokes direct browser grants', () => {
+    const migrationFiles = readdirSync(new URL('../../supabase/migrations/', import.meta.url)).filter((name) => name.endsWith('.sql'))
+    const migrations = migrationFiles.map((name) => readFileSync(new URL(`../../supabase/migrations/${name}`, import.meta.url), 'utf8')).join('\n')
+    const tables = [...migrations.matchAll(/create table(?: if not exists)? public\.([a-z_][a-z_0-9]*)\s*\(/gi)].map(([, name]) => name.toLowerCase())
+    const uniqueTables = [...new Set(tables)]
+    expect(uniqueTables.length).toBeGreaterThan(10)
+
+    const rowSecurity = new Set([...migrations.matchAll(/alter table public\.([a-z_][a-z_0-9]*) enable row level security/gi)].map(([, name]) => name.toLowerCase()))
+    const directGrants = [...migrations.matchAll(/revoke all on (public\.[^;]+?) from anon, authenticated;/gi)]
+      .flatMap(([, names]) => names.split(',').map((name) => name.trim().replace(/^public\./i, '').toLowerCase()))
+
+    for (const table of uniqueTables) {
+      expect(rowSecurity, `${table} must enable RLS`).toContain(table)
+      expect(directGrants, `${table} must deny anon/authenticated table grants`).toContain(table)
+    }
+  })
+
+  it('revokes public browser execution from every SECURITY DEFINER function', () => {
+    const migrationFiles = readdirSync(new URL('../../supabase/migrations/', import.meta.url)).filter((name) => name.endsWith('.sql'))
+    const migrations = migrationFiles.map((name) => readFileSync(new URL(`../../supabase/migrations/${name}`, import.meta.url), 'utf8')).join('\n')
+    const definitions = [...migrations.matchAll(/create or replace function public\.([a-z_][a-z_0-9]*)\s*\(([\s\S]*?)(?=create or replace function public\.|$)/gi)]
+      .filter(([, , body]) => /\bsecurity definer\b/i.test(body))
+    expect(definitions.length).toBeGreaterThan(10)
+
+    const revokedFunctions = new Set([...migrations.matchAll(/revoke all on function public\.([a-z_][a-z_0-9]*)\s*\([^;]*\)\s+from public,\s*anon,\s*authenticated;/gi)].map(([, name]) => name.toLowerCase()))
+    for (const [, name] of definitions) {
+      expect(revokedFunctions, `${name} must revoke PUBLIC/anon/authenticated execution`).toContain(name.toLowerCase())
+    }
   })
 })
