@@ -125,7 +125,7 @@ describe('quiz engine', () => {
     }))
     const migrated = loadProgress(storage)
     expect(migrated.recovered).toBe(false)
-    expect(migrated.progress.version).toBe(8)
+    expect(migrated.progress.version).toBe(9)
     expect(migrated.progress.activeSessions.practice.sessionId).toBeTruthy()
     expect(loadProgress(storage).progress.activeSessions.practice.questionIds).toEqual(['qa-01'])
 
@@ -145,7 +145,7 @@ describe('quiz engine', () => {
 
     const migrated = loadProgress(storage)
     expect(migrated.recovered).toBe(false)
-    expect(migrated.progress.version).toBe(8)
+    expect(migrated.progress.version).toBe(9)
     expect(migrated.progress.xp).toBe(150)
     expect(migrated.progress.completedLessonIds).toEqual(['basics-qa', 'sql-model'])
     expect(migrated.progress.achievementDates).toEqual({})
@@ -182,12 +182,34 @@ describe('quiz engine', () => {
     }))
     const migrated = loadProgress(storage)
     expect(migrated.recovered).toBe(false)
-    expect(migrated.progress.version).toBe(8)
+    expect(migrated.progress.version).toBe(9)
     expect(migrated.progress.seasonalResults).toEqual({
       '2026-11': {
         'arena-scenarios': { bestScore: 80, completedAt: '2026-11-10T10:00:00.000Z' },
         'marathon-sql': { bestScore: 75, completedAt: '2026-11-10T10:00:00.000Z' },
       },
+    })
+  })
+
+  it('preserves project answers and best scores when migrating schema v8', () => {
+    const storage = memoryStorage(JSON.stringify({
+      ...createInitialProgress(),
+      version: 8,
+      projectProgress: {
+        'idor-security': {
+          answers: { 'trust-boundary': 'server-owner', coverage: 'access-matrix', denial: 'deny-no-data', evidence: 'synthetic-proof' },
+          bestScore: 100,
+          completedAt: '2026-11-10T10:00:00.000Z',
+        },
+      },
+    }))
+    const migrated = loadProgress(storage)
+    expect(migrated.recovered).toBe(false)
+    expect(migrated.progress.version).toBe(9)
+    expect(migrated.progress.projectProgress['idor-security']).toEqual({
+      answers: { 'trust-boundary': 'server-owner', coverage: 'access-matrix', denial: 'deny-no-data', evidence: 'synthetic-proof' },
+      bestScore: 100,
+      completedAt: '2026-11-10T10:00:00.000Z',
     })
   })
 

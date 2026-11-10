@@ -3,6 +3,7 @@ import { createId, createSession, validateAnswer } from '../lib/quizEngine.js'
 import { createInitialProgress, loadProgress, resetProgress, saveProgress } from '../lib/progressStorage.js'
 import { utcDateKey } from '../lib/dailyTask.js'
 import { theoryTopics } from '../data/theory.js'
+import { qaProjects, scoreProject } from '../data/qaProjects.js'
 import { claimCloudWeeklyMission, cloudProfile, cloudStats, cloudStatus, connectTelegram, createCloudQuizSession, fetchArenaLeaderboard as fetchCloudArenaLeaderboard, fetchCloudXpHistory, fetchSkillComparison as fetchCloudSkillComparison, fetchWeeklyMissions, getAuthenticatedTelegramInitData, isServerScoringRequired, resetCloudProgress, saveCloudLessonProgress, serverScoringIsActive, submitCloudArenaResult, submitCloudAttempt } from '../lib/cloudApi.js'
 
 const SAFE_LESSON_ID = /^[a-z0-9][a-z0-9-]{0,79}$/
@@ -47,6 +48,7 @@ const achievements = computed(() => {
   const designLessons = theoryTopics.find(({ id }) => id === 'test-design')?.lessons ?? []
   const accuracyReady = progress.answeredCount >= 10
   const completedActivities = Object.values(progress.practiceResults).filter(({ bestScore }) => bestScore >= 75)
+  const passedProjects = qaProjects.filter(({ id }) => progress.projectProgress[id]?.bestScore >= 75).length
 
   return [
     achievement('first-answer', 'Первый шаг', 'Ответить на первый вопрос', 'sparkles', 'Практика', progress.answeredCount, 1),
@@ -83,6 +85,8 @@ const achievements = computed(() => {
     achievement('five-hundred-xp', 'Опытный тестировщик', 'Набрать 500 XP', 'zap', 'Опыт', progress.xp, 500, 'Необычное'),
     achievement('thousand-xp', 'Тысяча опыта', 'Набрать 1 000 XP', 'award', 'Опыт', progress.xp, 1_000, 'Редкое'),
     achievement('two-thousand-xp', 'Мастер практики', 'Набрать 2 500 XP', 'trophy', 'Опыт', progress.xp, 2_500, 'Эпическое'),
+    achievement('first-project', 'Первый проект', 'Набрать не меньше 75% в сквозном проекте', 'layers', 'Обучение', passedProjects, 1, 'Необычное'),
+    achievement('three-projects', 'Готов к Middle', 'Набрать не меньше 75% во всех трёх сквозных проектах', 'trophy', 'Обучение', passedProjects, qaProjects.length, 'Эпическое'),
   ].map((item) => ({ ...item, earnedAt: progress.achievementDates[item.id] ?? null }))
 })
 
@@ -137,6 +141,20 @@ function recordPracticeResult(activityId, score) {
     for (const oldSeason of Object.keys(progress.seasonalResults).sort().slice(0, -12)) delete progress.seasonalResults[oldSeason]
   }
   return true
+}
+
+function recordProjectAnswer(projectId, taskId, optionId) {
+  const project = qaProjects.find(({ id }) => id === projectId)
+  const task = project?.tasks.find(({ id }) => id === taskId)
+  if (!task?.options.some(({ id }) => id === optionId)) return null
+  const entry = progress.projectProgress[projectId] ??= { answers: {}, bestScore: 0, completedAt: null }
+  entry.answers[taskId] = optionId
+  const result = scoreProject(project, entry.answers)
+  if (result.complete) {
+    entry.bestScore = Math.max(entry.bestScore, result.score)
+    entry.completedAt = new Date().toISOString()
+  }
+  return { ...result, bestScore: entry.bestScore, completedAt: entry.completedAt }
 }
 
 function recordLocalXpTransaction({ id, title, amount }) {
@@ -404,6 +422,7 @@ export function useProgress() {
     markLessonComplete,
     recordLessonPractice,
     recordPracticeResult,
+    recordProjectAnswer,
     clearProgress,
   }
 }

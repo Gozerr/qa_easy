@@ -7,6 +7,7 @@ export const router = createRouter({
     { path: '/theory', name: 'theory', component: () => import('./views/TheoryView.vue'), meta: { title: 'Теория' } },
     { path: '/practice', name: 'practice', component: () => import('./views/PracticeView.vue'), meta: { title: 'Практика' } },
     { path: '/lab', name: 'lab', component: () => import('./views/LabView.vue'), meta: { title: 'QA Lab' } },
+    { path: '/projects', name: 'projects', component: () => import('./views/ProjectsView.vue'), meta: { title: 'Практические проекты' } },
     { path: '/arena', name: 'arena', component: () => import('./views/ArenaView.vue'), meta: { title: 'QA Arena' } },
     { path: '/marathons', name: 'marathons', component: () => import('./views/MarathonsView.vue'), meta: { title: 'QA-марафоны' } },
     { path: '/interview', name: 'interview', component: () => import('./views/InterviewView.vue'), meta: { title: 'Собеседование' } },

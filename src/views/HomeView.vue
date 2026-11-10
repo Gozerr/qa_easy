@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
-import { ArrowRight, BookOpen, Bug, CalendarCheck, Check, ChevronRight, Database, Flame, MessageCircleQuestion, Play, Sparkles, Trophy, Zap } from '@lucide/vue'
+import { ArrowRight, BookOpen, Bug, CalendarCheck, Check, ChevronRight, ClipboardCheck, Database, Flame, MessageCircleQuestion, Play, Sparkles, Trophy, Zap } from '@lucide/vue'
 import { useUtcDate } from '../composables/useUtcDate.js'
 import { useQuestionBank } from '../composables/useQuestionBank.js'
 import { useProgress } from '../composables/useProgress.js'
@@ -35,6 +35,7 @@ const featureCards = computed(() => [
   { to: '/theory', title: 'Теория', subtitle: 'Короткие темы и практика', icon: BookOpen, tone: 'sky' },
   { to: '/practice', title: 'Найди багулю', subtitle: 'Разбирай реальные ситуации', icon: Bug, tone: 'coral' },
   { to: '/lab', title: 'QA Lab', subtitle: 'SQL и API на практике', icon: Database, tone: 'blue' },
+  { to: '/projects', title: 'Проекты', subtitle: 'Security, интеграции и CI', icon: ClipboardCheck, tone: 'sky' },
   { to: '/interview', title: 'Собеседование', subtitle: 'Junior и Middle', icon: MessageCircleQuestion, tone: 'peach' },
   { to: '/daily', title: 'QA Daily', subtitle: dailyDone.value ? 'Задание выполнено' : 'Задание на 2 минуты', icon: CalendarCheck, tone: 'blue' },
   { to: '/leaderboard', title: 'Рейтинг', subtitle: 'Сравни результаты', icon: Trophy, tone: 'coral' },

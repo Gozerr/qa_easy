@@ -32,9 +32,9 @@ test('QA Daily сохраняет ответ и отмечает выполне�
 test('коллекция достижений показывает прогресс и фильтруется по категориям', async ({ page }) => {
   await page.getByRole('link', { name: 'Профиль', exact: true }).click()
   await expect(page.locator('.achievement-row')).toHaveCount(0)
-  await page.getByRole('link', { name: 'Все 34' }).click()
+  await page.getByRole('link', { name: 'Все 36' }).click()
   await expect(page.getByRole('heading', { name: 'Все достижения' })).toBeVisible()
-  await expect(page.locator('.achievement-row')).toHaveCount(34)
+  await expect(page.locator('.achievement-row')).toHaveCount(36)
   await page.getByRole('button', { name: 'Точность' }).click()
   await expect(page.locator('.achievement-row')).toHaveCount(4)
   await expect(page.locator('.achievement-row').first()).toContainText('Точный глаз')
@@ -158,6 +158,55 @@ test('тематический марафон сохраняет отдельн�
   await expect(page.locator('.result-state h2')).toContainText('из 10 верно')
   await expect(page.locator('.marathon-challenge-card')).toContainText('Результат марафона:')
   await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('qa-na-paltsakh:progress')).practiceResults['marathon-web-api']?.bestScore)).toBeGreaterThanOrEqual(0)
+})
+
+test('сквозные проекты проверяют API security, интеграции и стабильность CI и сохраняют ответы', async ({ page }) => {
+  await page.goto('projects')
+  await expect(page.getByRole('heading', { name: 'Собери решение по шагам' })).toBeVisible()
+  const projects = [
+    {
+      title: /Заказ, который увидел не тот пользователь/,
+      answers: [
+        /На сервере проверить сессию и принадлежность заказа текущему пользователю/,
+        /Сверить владельца, другого пользователя и роль администратора/,
+        /Вернуть согласованный 403 или 404/,
+        /Синтетические аккаунты A\/B/,
+      ],
+    },
+    {
+      title: /Платёжный callback пришёл дважды/,
+      answers: [
+        /Дважды отправить один event ID/,
+        /изолированной тестовой БД и контролируемой очередью/,
+        /Повтор с тем же ключом безопасен/,
+        /Корреляционный ID, event ID/,
+      ],
+    },
+    {
+      title: /Нестабильный checkout в CI/,
+      answers: [
+        /Правила расчёта покрыть быстрыми unit\/API тестами/,
+        /Устойчивым доступным locator по роли кнопки/,
+        /изолированные тестовые данные через fixture/,
+        /Ждать конкретного состояния интерфейса/,
+      ],
+    },
+  ]
+
+  for (const project of projects) {
+    await page.getByRole('button', { name: project.title }).click()
+    for (let index = 0; index < project.answers.length; index += 1) {
+      await page.getByRole('button', { name: project.answers[index] }).click()
+      await expect(page.locator('.project-explanation')).toBeVisible()
+      if (index < project.answers.length - 1) await page.getByRole('button', { name: 'Дальше' }).click()
+    }
+    await expect(page.locator('.project-result')).toContainText('Проект сдан · 100%')
+  }
+
+  await page.reload()
+  await expect(page.locator('.project-result')).toContainText('Проект сдан · 100%')
+  await expect(page.locator('.project-picker-card.is-complete')).toHaveCount(3)
+  await expect.poll(() => page.evaluate(() => Object.keys(JSON.parse(localStorage.getItem('qa-na-paltsakh:progress')).projectProgress).length)).toBe(3)
 })
 
 test('практикум связывает кейсы, баг-репорты и ветвящееся расследование', async ({ page }) => {
@@ -306,7 +355,7 @@ test('malformed localStorage и вредоносный query остаются н
 
 test('все экраны не переполняют viewport в двух темах на телефоне, планшете и desktop', async ({ page }) => {
   const widths = [320, 360, 390, 768, 1280]
-    const routes = ['./', 'theory', 'practice', 'lab', 'arena', 'marathons', 'interview', 'daily', 'profile', 'xp-history', 'achievements', 'leaderboard']
+    const routes = ['./', 'theory', 'practice', 'lab', 'projects', 'arena', 'marathons', 'interview', 'daily', 'profile', 'xp-history', 'achievements', 'leaderboard']
 
   for (const width of widths) {
     await page.setViewportSize({ width, height: 850 })

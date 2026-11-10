@@ -1,7 +1,8 @@
 import { createId } from './quizEngine.js'
+import { qaProjects } from '../data/qaProjects.js'
 
 export const STORAGE_KEY = 'qa-na-paltsakh:progress'
-export const STORAGE_VERSION = 8
+export const STORAGE_VERSION = 9
 
 const MAX_STORAGE_CHARS = 256_000
 const MAX_COUNT = 1_000_000_000
@@ -40,6 +41,7 @@ export function createInitialProgress() {
     achievementDates: {},
     practiceResults: {},
     seasonalResults: {},
+    projectProgress: {},
     lessonPractices: {},
     xpTransactions: [],
     theme: 'system',
@@ -55,7 +57,7 @@ function browserStorage() {
 }
 
 function normalizeProgress(value) {
-  if (!value || ![1, 2, 3, 4, 5, 6, 7, STORAGE_VERSION].includes(value.version)) return null
+  if (!value || ![1, 2, 3, 4, 5, 6, 7, 8, STORAGE_VERSION].includes(value.version)) return null
   const migrating = value.version < STORAGE_VERSION
   if (!Number.isSafeInteger(value.xp) || !Number.isSafeInteger(value.answeredCount) || !Number.isSafeInteger(value.correctCount)) return null
   if (value.xp < 0 || value.answeredCount < 0 || value.correctCount < 0 || value.correctCount > value.answeredCount) return null
@@ -69,8 +71,10 @@ function normalizeProgress(value) {
   if (value.version === STORAGE_VERSION && (!value.achievementDates || typeof value.achievementDates !== 'object' || Array.isArray(value.achievementDates))) return null
   if (value.achievementDates && (typeof value.achievementDates !== 'object' || Array.isArray(value.achievementDates) || Object.keys(value.achievementDates).length > 100)) return null
   if (value.version === STORAGE_VERSION && (!value.practiceResults || typeof value.practiceResults !== 'object' || Array.isArray(value.practiceResults))) return null
+  if (value.version === STORAGE_VERSION && (!value.projectProgress || typeof value.projectProgress !== 'object' || Array.isArray(value.projectProgress))) return null
   if (value.practiceResults && (typeof value.practiceResults !== 'object' || Array.isArray(value.practiceResults) || Object.keys(value.practiceResults).length > 1_000)) return null
   if (value.seasonalResults && (typeof value.seasonalResults !== 'object' || Array.isArray(value.seasonalResults) || Object.keys(value.seasonalResults).length > 120)) return null
+  if (value.projectProgress && (typeof value.projectProgress !== 'object' || Array.isArray(value.projectProgress) || Object.keys(value.projectProgress).length > 20)) return null
   if (value.version === STORAGE_VERSION && (!value.lessonPractices || typeof value.lessonPractices !== 'object' || Array.isArray(value.lessonPractices))) return null
   if (value.lessonPractices && (typeof value.lessonPractices !== 'object' || Array.isArray(value.lessonPractices) || Object.keys(value.lessonPractices).length > 1_000)) return null
   if (value.version === STORAGE_VERSION && (!Array.isArray(value.xpTransactions) || value.xpTransactions.length > MAX_XP_TRANSACTIONS)) return null
@@ -163,6 +167,20 @@ function normalizeProgress(value) {
         return [[id, { bestScore: result.bestScore, completedAt: result.completedAt }]]
       }))
       return [[season, clean]]
+    })),
+    projectProgress: Object.fromEntries(qaProjects.flatMap(({ id, tasks }) => {
+      const entry = value.projectProgress?.[id]
+      if (!entry || typeof entry !== 'object' || Array.isArray(entry) || !entry.answers || typeof entry.answers !== 'object' || Array.isArray(entry.answers)) return []
+      const answers = Object.fromEntries(tasks.flatMap((task) => {
+        const optionId = entry.answers[task.id]
+        return task.options.some(({ id: candidateId }) => candidateId === optionId) ? [[task.id, optionId]] : []
+      }))
+      const validDate = isIsoTimestamp(entry.completedAt)
+      return [[id, {
+        answers,
+        bestScore: Number.isInteger(entry.bestScore) ? Math.max(0, Math.min(100, entry.bestScore)) : 0,
+        completedAt: validDate ? entry.completedAt : null,
+      }]]
     })),
     lessonPractices: Object.fromEntries(Object.entries(value.lessonPractices ?? {}).flatMap(([id, result]) => {
       if (!SAFE_ID.test(id) || !result || typeof result !== 'object' || !isIsoTimestamp(result.completedAt)) return []

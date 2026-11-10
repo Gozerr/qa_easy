@@ -940,6 +940,62 @@ button:focus-visible, a:focus-visible, summary:focus-visible { outline: 3px soli
 .season-award-card.is-earned .season-award-state { color: var(--success); }
 @media (min-width: 700px) { .season-awards-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 
+.projects-page { gap: 15px; }
+.project-picker { display: grid; gap: 8px; }
+.project-picker-card { display: grid; grid-template-columns: 38px minmax(0, 1fr) 18px; align-items: center; gap: 10px; width: 100%; min-height: 68px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 15px; color: var(--text); background: var(--surface); text-align: left; cursor: pointer; transition: border-color 160ms ease, background 160ms ease, transform 160ms ease; }
+.project-picker-card:active { transform: scale(.99); }
+.project-picker-card.is-active { border-color: var(--accent); background: var(--accent-soft); }
+.project-picker-icon { display: grid; width: 36px; height: 36px; place-items: center; border-radius: 12px; color: var(--accent); background: var(--surface-secondary); }
+.project-picker-card > span:nth-child(2) { display: grid; gap: 3px; min-width: 0; }
+.project-picker-card small { color: var(--muted); font-size: 8px; font-weight: 750; letter-spacing: .08em; }
+.project-picker-card strong { overflow: hidden; font-size: 11px; line-height: 1.35; text-overflow: ellipsis; }
+.project-picker-done { color: var(--success); }
+.project-workbench { display: grid; gap: 12px; padding: 14px; border: 1px solid var(--line); border-radius: 20px; background: var(--surface); box-shadow: var(--shadow-card); }
+.project-workbench-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.project-workbench-heading h2 { margin: 4px 0 0; font-size: clamp(17px, 4.5vw, 22px); line-height: 1.2; }
+.project-best-score { flex: 0 0 auto; padding: 6px 8px; border-radius: 10px; color: var(--muted); background: var(--surface-secondary); font-size: 9px; }
+.project-best-score strong { color: var(--text); }
+.project-brief { display: grid; grid-template-columns: 31px minmax(0, 1fr); gap: 9px; padding: 12px; border-radius: 15px; background: var(--surface-secondary); }
+.project-brief-icon { display: grid; width: 30px; height: 30px; place-items: center; border-radius: 10px; color: var(--accent); background: var(--surface); }
+.project-brief strong { font-size: 10px; }
+.project-brief p { margin: 4px 0 0; color: var(--muted-strong); font-size: 10px; line-height: 1.55; }
+.project-deliverable { display: grid; gap: 3px; padding: 0 1px; }
+.project-deliverable > span { color: var(--muted); font-size: 8px; font-weight: 750; letter-spacing: .09em; }
+.project-deliverable strong { font-size: 11px; }
+.project-deliverable small { color: var(--muted); font-size: 9px; }
+.project-progress-track { height: 5px; overflow: hidden; border-radius: 99px; background: var(--surface-secondary); }
+.project-progress-track > span { display: block; height: 100%; border-radius: inherit; background: var(--accent); transition: width 220ms ease; }
+.project-task-card { display: grid; gap: 11px; padding: 13px; border: 1px solid var(--line); border-radius: 16px; }
+.project-task-index { display: flex; justify-content: space-between; color: var(--muted); font-size: 8px; font-weight: 750; letter-spacing: .07em; }
+.project-task-card h3 { margin: 0; font-size: 14px; line-height: 1.45; }
+.project-options { display: grid; gap: 7px; }
+.project-option { display: grid; grid-template-columns: 26px minmax(0, 1fr) 17px; align-items: center; gap: 8px; min-height: 48px; padding: 9px; border: 1px solid var(--line); border-radius: 12px; color: var(--text); background: var(--surface); text-align: left; cursor: pointer; }
+.project-option:focus-visible, .project-picker-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.project-option > span:nth-child(2) { font-size: 10px; line-height: 1.45; }
+.project-option-letter { display: grid; width: 25px; height: 25px; place-items: center; border-radius: 8px; color: var(--muted-strong); background: var(--surface-secondary); font-size: 9px; font-weight: 750; }
+.project-option.is-selected { border-color: var(--accent); background: var(--accent-soft); }
+.project-option.is-correct { border-color: var(--success); background: var(--success-soft); }
+.project-option.is-incorrect { border-color: var(--warning); background: var(--warning-soft); }
+.project-option-cross { color: var(--warning); font-size: 19px; line-height: 1; text-align: center; }
+.project-explanation { margin: 0; padding: 10px; border-radius: 11px; color: var(--muted-strong); background: var(--surface-secondary); font-size: 10px; line-height: 1.55; }
+.project-explanation.is-correct { color: var(--success); background: var(--success-soft); }
+.project-task-navigation { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding-top: 3px; }
+.project-task-navigation > span { color: var(--muted); font-size: 8px; }
+.project-task-navigation .button { display: inline-flex; align-items: center; gap: 5px; min-height: 34px; padding-inline: 9px; font-size: 9px; }
+.project-task-navigation .button:disabled { opacity: .45; cursor: not-allowed; }
+.project-result { display: grid; grid-template-columns: 31px minmax(0, 1fr); align-items: start; gap: 9px; padding: 12px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface-secondary); }
+.project-result.is-passed { border-color: color-mix(in srgb, var(--success) 40%, var(--line)); background: var(--success-soft); }
+.project-result-icon { color: var(--accent); }
+.project-result.is-passed .project-result-icon { color: var(--success); }
+.project-result strong { font-size: 11px; }
+.project-result p { margin: 4px 0 0; color: var(--muted-strong); font-size: 9px; line-height: 1.5; }
+.project-local-note { margin: 0; color: var(--muted); font-size: 9px; line-height: 1.5; }
+@media (min-width: 680px) {
+  .project-picker { grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: stretch; }
+  .project-picker-card { grid-template-columns: 34px minmax(0, 1fr) 16px; align-content: start; min-height: 90px; padding: 11px; }
+  .project-workbench { padding: 18px; }
+}
+
 @media (max-width: 420px) {
   .achievement-row { gap: 8px; padding-inline: 9px; }
   .achievement-status { max-width: 43px; text-align: right; white-space: normal; }
