@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import { normalizeLeaderboard } from './cloudApi.js'
 
 const migration = readFileSync(new URL('../../supabase/migrations/20261111000000_leaderboard.sql', import.meta.url), 'utf8')
+const avatarMigration = readFileSync(new URL('../../supabase/migrations/20261112000000_leaderboard_avatars.sql', import.meta.url), 'utf8')
 const endpoint = readFileSync(new URL('../../supabase/functions/quiz-api/index.ts', import.meta.url), 'utf8')
 const validLeaderboard = {
   entries: [
@@ -18,8 +19,8 @@ describe('leaderboard privacy and response validation', () => {
   it('accepts server rankings and strips unapproved identity fields', () => {
     expect(normalizeLeaderboard(validLeaderboard)).toEqual({
       entries: [
-        { rank: 1, displayName: 'QA Мастер', xp: 120, answeredCount: 18, accuracy: 83 },
-        { rank: 2, displayName: 'Тестировщик 2', xp: 90, answeredCount: 12, accuracy: 75 },
+        { rank: 1, displayName: 'QA Мастер', xp: 120, answeredCount: 18, accuracy: 83, avatarUrl: null },
+        { rank: 2, displayName: 'Тестировщик 2', xp: 90, answeredCount: 12, accuracy: 75, avatarUrl: null },
       ],
       currentUserRank: 2,
       totalParticipants: 2,
@@ -45,5 +46,13 @@ describe('leaderboard privacy and response validation', () => {
     expect(endpoint).toContain('verifySessionToken(token, sessionSecret)')
     expect(endpoint).toContain("body.action === 'update_leaderboard'")
     expect(endpoint).toContain("body.action === 'get_leaderboard'")
+    expect(endpoint).toContain("body.action === 'get_leaderboard_preferences'")
+  })
+
+  it('returns photos only in the opted-in public leaderboard response', () => {
+    expect(avatarMigration).toContain("'avatarUrl', ranked.avatar_url")
+    expect(avatarMigration).toContain('where profile.leaderboard_enabled and profile.leaderboard_name is not null')
+    expect(avatarMigration).not.toContain("'telegramUserId'")
+    expect(avatarMigration).toContain('to service_role;')
   })
 })

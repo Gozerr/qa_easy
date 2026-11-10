@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test'
 
 test.beforeEach(async ({ page }) => {
+  await page.route('https://telegram.org/**', (route) => route.abort())
   await page.goto('./')
   await page.evaluate(() => localStorage.clear())
   await page.reload()
@@ -17,9 +18,21 @@ test('QA Daily сохраняет ответ и отмечает выполне�
 
   await page.reload()
   await expect(page.locator('.result-state')).toBeVisible()
-  await page.getByRole('link', { name: 'Профиль' }).click()
+  await page.getByRole('link', { name: 'Профиль', exact: true }).click()
   await expect(page.locator('.profile-daily-count strong')).toHaveText('1')
   await expect(page.locator('.xp-mark')).not.toHaveText(/^\s*0 XP$/)
+})
+
+test('коллекция достижений показывает прогресс и фильтруется по категориям', async ({ page }) => {
+  await page.getByRole('link', { name: 'Профиль', exact: true }).click()
+  await expect(page.locator('.achievement-row')).toHaveCount(0)
+  await page.getByRole('link', { name: 'Все 29' }).click()
+  await expect(page.getByRole('heading', { name: 'Все достижения' })).toBeVisible()
+  await expect(page.locator('.achievement-row')).toHaveCount(29)
+  await page.getByRole('button', { name: 'Точность' }).click()
+  await expect(page.locator('.achievement-row')).toHaveCount(4)
+  await expect(page.locator('.achievement-row').first()).toContainText('Точный глаз')
+  await expect(page.locator('.achievement-row .achievement-progress-track').first()).toHaveAttribute('role', 'progressbar')
 })
 
 test('собеседование переключает набор, а теория открывает фильтрованный материал', async ({ page }) => {
@@ -32,7 +45,7 @@ test('собеседование переключает набор, а теор�
 
   await page.goto('theory?category=Web%20%D0%B8%20API')
   await expect(page.locator('.theory-topic')).toHaveCount(1)
-  await expect(page.getByText('Читаем ответы HTTP', { exact: true })).toBeVisible()
+  await expect(page.getByText('Web-тестирование', { exact: true })).toBeVisible()
 })
 
 test('тема сохраняется после перезагрузки', async ({ page }) => {
@@ -102,7 +115,7 @@ test('malformed localStorage и вредоносный query остаются н
 
 test('все экраны не переполняют viewport в двух темах на телефоне, планшете и desktop', async ({ page }) => {
   const widths = [320, 360, 390, 768, 1280]
-    const routes = ['./', 'theory', 'practice', 'interview', 'daily', 'profile', 'leaderboard']
+    const routes = ['./', 'theory', 'practice', 'interview', 'daily', 'profile', 'achievements', 'leaderboard']
 
   for (const width of widths) {
     await page.setViewportSize({ width, height: 850 })

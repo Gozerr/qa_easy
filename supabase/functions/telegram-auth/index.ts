@@ -43,7 +43,16 @@ Deno.serve(async (request: Request) => {
     if (statsError || !progress) throw new Error('Progress retrieval failed')
 
     const accessToken = await issueSessionToken(verified.telegramUserId, sessionSecret)
-    return jsonResponse(request, { accessToken, progress })
+    return jsonResponse(request, {
+      accessToken,
+      progress,
+      profile: {
+        firstName: verified.firstName,
+        lastName: verified.lastName,
+        username: verified.username,
+        avatarUrl: verified.avatarUrl,
+      },
+    })
   } catch (error) {
     if (error instanceof TelegramAuthError) return jsonResponse(request, { error: 'Сессия Telegram недействительна или устарела.' }, 401)
     if (error instanceof SyntaxError) return jsonResponse(request, { error: 'Некорректный запрос.' }, 400)

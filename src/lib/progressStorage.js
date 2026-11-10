@@ -1,7 +1,7 @@
 import { createId } from './quizEngine.js'
 
 export const STORAGE_KEY = 'qa-na-paltsakh:progress'
-export const STORAGE_VERSION = 2
+export const STORAGE_VERSION = 4
 
 const MAX_STORAGE_CHARS = 256_000
 const MAX_COUNT = 1_000_000_000
@@ -19,6 +19,12 @@ function isUtcDate(value) {
   return Number.isFinite(timestamp) && new Date(timestamp).toISOString().slice(0, 10) === value
 }
 
+function isIsoTimestamp(value) {
+  if (typeof value !== 'string') return false
+  const timestamp = Date.parse(value)
+  return Number.isFinite(timestamp) && new Date(timestamp).toISOString() === value
+}
+
 export function createInitialProgress() {
   return {
     version: STORAGE_VERSION,
@@ -29,6 +35,8 @@ export function createInitialProgress() {
     dailyCompletions: [],
     activeSessions: {},
     pendingCloudAttempts: [],
+    completedLessonIds: [],
+    achievementDates: {},
     theme: 'system',
   }
 }
@@ -42,8 +50,8 @@ function browserStorage() {
 }
 
 function normalizeProgress(value) {
-  if (!value || ![1, STORAGE_VERSION].includes(value.version)) return null
-  const migrating = value.version === 1
+  if (!value || ![1, 2, 3, STORAGE_VERSION].includes(value.version)) return null
+  const migrating = value.version < STORAGE_VERSION
   if (!Number.isSafeInteger(value.xp) || !Number.isSafeInteger(value.answeredCount) || !Number.isSafeInteger(value.correctCount)) return null
   if (value.xp < 0 || value.answeredCount < 0 || value.correctCount < 0 || value.correctCount > value.answeredCount) return null
   if (value.xp > MAX_COUNT || value.answeredCount > MAX_COUNT || value.correctCount > MAX_COUNT) return null
@@ -51,7 +59,10 @@ function normalizeProgress(value) {
   if (!value.activeSessions || typeof value.activeSessions !== 'object' || Array.isArray(value.activeSessions)) return null
   if (value.completedQuestionIds.length > MAX_COMPLETED_QUESTIONS || value.dailyCompletions.length > MAX_DAILY_COMPLETIONS) return null
   if (Object.keys(value.activeSessions).length > MAX_ACTIVE_SESSIONS) return null
-  if (value.version === STORAGE_VERSION && (!Array.isArray(value.pendingCloudAttempts) || value.pendingCloudAttempts.length > MAX_PENDING_ATTEMPTS)) return null
+  if (value.version >= 2 && (!Array.isArray(value.pendingCloudAttempts) || value.pendingCloudAttempts.length > MAX_PENDING_ATTEMPTS)) return null
+  if (value.version === STORAGE_VERSION && !Array.isArray(value.completedLessonIds)) return null
+  if (value.version === STORAGE_VERSION && (!value.achievementDates || typeof value.achievementDates !== 'object' || Array.isArray(value.achievementDates))) return null
+  if (value.achievementDates && (typeof value.achievementDates !== 'object' || Array.isArray(value.achievementDates) || Object.keys(value.achievementDates).length > 100)) return null
 
   const activeSessions = Object.fromEntries(Object.entries(value.activeSessions).flatMap(([mode, session]) => {
     if (!SAFE_ID.test(mode)) return []
@@ -110,7 +121,7 @@ function normalizeProgress(value) {
     }]]
   }))
 
-  const pendingCloudAttempts = migrating ? [] : value.pendingCloudAttempts.filter((attempt) => attempt
+  const pendingCloudAttempts = value.version < 2 ? [] : value.pendingCloudAttempts.filter((attempt) => attempt
     && UUID.test(attempt.attemptId)
     && UUID.test(attempt.sessionId)
     && SAFE_ID.test(attempt.questionId)
@@ -127,6 +138,8 @@ function normalizeProgress(value) {
     dailyCompletions: [...new Set(value.dailyCompletions.filter(isUtcDate))],
     activeSessions,
     pendingCloudAttempts,
+    completedLessonIds: [...new Set((Array.isArray(value.completedLessonIds) ? value.completedLessonIds : []).filter((id) => typeof id === 'string' && SAFE_ID.test(id)))],
+    achievementDates: Object.fromEntries(Object.entries(value.achievementDates ?? {}).filter(([id, date]) => SAFE_ID.test(id) && isIsoTimestamp(date))),
     theme: ['system', 'light', 'dark'].includes(value.theme) ? value.theme : 'system',
   }
 }

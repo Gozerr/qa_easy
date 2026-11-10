@@ -173,6 +173,16 @@ Deno.serve(async (request: Request) => {
       if (error || !data) throw new Error('Progress retrieval failed')
       return jsonResponse(request, { progress: data })
     }
+    if (body.action === 'get_leaderboard_preferences') {
+      const { data: profile, error } = await client.from('profiles')
+        .select('leaderboard_enabled,leaderboard_name')
+        .eq('telegram_user_id', telegramUserId)
+        .single()
+      if (error || !profile) throw new Error('Leaderboard preferences unavailable')
+      return jsonResponse(request, {
+        preferences: { enabled: profile.leaderboard_enabled, displayName: profile.leaderboard_name ?? '' },
+      })
+    }
     if (body.action === 'get_leaderboard') {
       const { data: profile, error: profileError } = await client.from('profiles')
         .select('leaderboard_enabled,leaderboard_name')

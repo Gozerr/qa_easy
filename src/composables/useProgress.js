@@ -2,7 +2,10 @@ import { computed, reactive, ref, watch } from 'vue'
 import { createId, createSession, validateAnswer } from '../lib/quizEngine.js'
 import { createInitialProgress, loadProgress, resetProgress, saveProgress } from '../lib/progressStorage.js'
 import { utcDateKey } from '../lib/dailyTask.js'
-import { cloudStats, cloudStatus, connectTelegram, createCloudQuizSession, getAuthenticatedTelegramInitData, isServerScoringRequired, resetCloudProgress, serverScoringIsActive, submitCloudAttempt } from '../lib/cloudApi.js'
+import { theoryTopics } from '../data/theory.js'
+import { cloudProfile, cloudStats, cloudStatus, connectTelegram, createCloudQuizSession, getAuthenticatedTelegramInitData, isServerScoringRequired, resetCloudProgress, serverScoringIsActive, submitCloudAttempt } from '../lib/cloudApi.js'
+
+const SAFE_LESSON_ID = /^[a-z0-9][a-z0-9-]{0,79}$/
 
 const loaded = loadProgress()
 const progress = reactive(loaded.progress)
@@ -32,12 +35,62 @@ const currentStreak = computed(() => {
   return streak
 })
 
-const achievements = computed(() => [
-  { id: 'first-answer', title: 'Первый шаг', description: 'Ответить на первый вопрос', icon: 'sparkles', earned: progress.answeredCount >= 1 },
-  { id: 'ten-correct', title: 'Точный глаз', description: 'Дать 10 правильных ответов', icon: 'target', earned: progress.correctCount >= 10 },
-  { id: 'daily-streak', title: 'В ритме', description: 'Решать QA Daily 5 дней подряд', icon: 'flame', earned: currentStreak.value >= 5 },
-  { id: 'hundred-xp', title: 'Сотня опыта', description: 'Набрать 100 XP', icon: 'award', earned: progress.xp >= 100 },
-])
+function achievement(id, title, description, icon, category, current, target, rarity = 'Обычное') {
+  const value = Math.min(target, current)
+  return { id, title, description, icon, category, rarity, current: value, target, earned: current >= target, percent: Math.min(100, Math.round(current / target * 100)) }
+}
+
+const achievements = computed(() => {
+  const completedLessons = new Set(progress.completedLessonIds)
+  const finishedModules = theoryTopics.filter(({ lessons }) => lessons.every(({ id }) => completedLessons.has(id))).length
+  const designLessons = theoryTopics.find(({ id }) => id === 'test-design')?.lessons ?? []
+  const accuracyReady = progress.answeredCount >= 10
+
+  return [
+    achievement('first-answer', 'Первый шаг', 'Ответить на первый вопрос', 'sparkles', 'Практика', progress.answeredCount, 1),
+    achievement('first-correct', 'Попал в точку', 'Правильно ответить хотя бы один раз', 'target', 'Практика', progress.correctCount, 1),
+    achievement('ten-answers', 'Разогрев', 'Дать 10 ответов', 'message', 'Практика', progress.answeredCount, 10),
+    achievement('twenty-five-answers', 'Вошёл в ритм', 'Дать 25 ответов', 'message', 'Практика', progress.answeredCount, 25, 'Необычное'),
+    achievement('hundred-answers', 'Практик', 'Дать 100 ответов', 'target', 'Практика', progress.answeredCount, 100, 'Редкое'),
+    achievement('ten-correct', 'Точный глаз', 'Дать 10 правильных ответов', 'target', 'Точность', progress.correctCount, 10),
+    achievement('twenty-five-correct', 'Верная стратегия', 'Дать 25 правильных ответов', 'target', 'Точность', progress.correctCount, 25, 'Необычное'),
+    achievement('fifty-correct', 'QA-снайпер', 'Дать 50 правильных ответов', 'target', 'Точность', progress.correctCount, 50, 'Редкое'),
+    achievement('ninety-accuracy', 'Чистое попадание', 'Точность не ниже 90% после 10 ответов', 'award', 'Точность', accuracyReady && accuracy.value >= 90 ? 1 : 0, 1, 'Редкое'),
+    achievement('ten-unique-questions', 'Широкий взгляд', 'Решить 10 разных вопросов', 'layers', 'Практика', progress.completedQuestionIds.length, 10, 'Необычное'),
+    achievement('twenty-five-unique-questions', 'Исследователь', 'Решить 25 разных вопросов', 'search', 'Практика', progress.completedQuestionIds.length, 25, 'Редкое'),
+    achievement('first-lesson', 'Открыл теорию', 'Отметить первый урок изученным', 'book', 'Обучение', completedLessons.size, 1),
+    achievement('five-lessons', 'Учусь системно', 'Отметить пять уроков изученными', 'book', 'Обучение', completedLessons.size, 5),
+    achievement('ten-lessons', 'Ученик QA', 'Изучить 10 уроков', 'book', 'Обучение', completedLessons.size, 10, 'Необычное'),
+    achievement('twenty-five-lessons', 'Крепкая база', 'Изучить 25 уроков', 'book', 'Обучение', completedLessons.size, 25, 'Редкое'),
+    achievement('all-lessons', 'Карта пройдена', 'Изучить все уроки программы', 'trophy', 'Обучение', completedLessons.size, theoryTopics.reduce((sum, topic) => sum + topic.lessons.length, 0), 'Эпическое'),
+    achievement('first-module', 'Модуль закрыт', 'Завершить все уроки одного модуля', 'layers', 'Обучение', finishedModules, 1, 'Необычное'),
+    achievement('three-modules', 'Системный подход', 'Завершить три учебных модуля', 'layers', 'Обучение', finishedModules, 3, 'Редкое'),
+    achievement('test-design-module', 'Арсенал тест-дизайна', 'Изучить все уроки по тест-дизайну', 'target', 'Обучение', designLessons.length && designLessons.every(({ id }) => completedLessons.has(id)) ? 1 : 0, 1, 'Редкое'),
+    achievement('first-daily', 'На сегодня готово', 'Выполнить QA Daily', 'calendar', 'Регулярность', progress.dailyCompletions.length, 1),
+    achievement('seven-dailies', 'Неделя практики', 'Выполнить QA Daily в 7 разных дней', 'calendar', 'Регулярность', progress.dailyCompletions.length, 7, 'Необычное'),
+    achievement('thirty-dailies', 'Постоянство', 'Выполнить QA Daily в 30 разных дней', 'calendar', 'Регулярность', progress.dailyCompletions.length, 30, 'Редкое'),
+    achievement('three-day-streak', 'Три дня в деле', 'Заниматься 3 дня подряд', 'flame', 'Регулярность', currentStreak.value, 3),
+    achievement('weekly-streak', 'В ритме', 'Заниматься 7 дней подряд', 'flame', 'Регулярность', currentStreak.value, 7, 'Необычное'),
+    achievement('monthly-streak', 'Не сбавляя темп', 'Заниматься 30 дней подряд', 'flame', 'Регулярность', currentStreak.value, 30, 'Эпическое'),
+    achievement('hundred-xp', 'Сотня опыта', 'Набрать 100 XP', 'zap', 'Опыт', progress.xp, 100),
+    achievement('five-hundred-xp', 'Опытный тестировщик', 'Набрать 500 XP', 'zap', 'Опыт', progress.xp, 500, 'Необычное'),
+    achievement('thousand-xp', 'Тысяча опыта', 'Набрать 1 000 XP', 'award', 'Опыт', progress.xp, 1_000, 'Редкое'),
+    achievement('two-thousand-xp', 'Мастер практики', 'Набрать 2 500 XP', 'trophy', 'Опыт', progress.xp, 2_500, 'Эпическое'),
+  ].map((item) => ({ ...item, earnedAt: progress.achievementDates[item.id] ?? null }))
+})
+
+watch(achievements, (items) => {
+  const earnedAt = new Date().toISOString()
+  for (const item of items) {
+    if (item.earned && !progress.achievementDates[item.id]) progress.achievementDates[item.id] = earnedAt
+  }
+}, { immediate: true })
+
+function markLessonComplete(lessonId) {
+  if (typeof lessonId !== 'string' || !SAFE_LESSON_ID.test(lessonId)) return false
+  if (!progress.completedLessonIds.includes(lessonId)) progress.completedLessonIds.push(lessonId)
+  return true
+}
 
 function applyServerStats(stats) {
   progress.xp = stats.xp
@@ -239,6 +292,7 @@ export function useProgress() {
     pendingSync,
     cloudStatus,
     cloudStats,
+    cloudProfile,
     accuracy,
     currentStreak,
     achievements,
@@ -249,6 +303,7 @@ export function useProgress() {
     authenticateTelegram,
     syncPendingAttempts,
     setTheme,
+    markLessonComplete,
     clearProgress,
   }
 }

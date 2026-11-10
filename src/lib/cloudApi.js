@@ -13,6 +13,7 @@ export const cloudError = ref('')
 export const cloudStats = shallowRef(null)
 export const cloudQuestions = shallowRef([])
 export const cloudDailyTask = shallowRef(null)
+export const cloudProfile = shallowRef(null)
 
 let accessToken = null
 
@@ -24,6 +25,25 @@ function validDate(value) {
   if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false
   const time = Date.parse(`${value}T00:00:00.000Z`)
   return Number.isFinite(time) && new Date(time).toISOString().slice(0, 10) === value
+}
+
+export function normalizeTelegramProfile(value) {
+  if (!value || typeof value !== 'object' || typeof value.firstName !== 'string' || value.firstName.trim().length === 0 || value.firstName.length > 128) return null
+  const profile = {
+    firstName: value.firstName.trim(),
+    lastName: typeof value.lastName === 'string' && value.lastName.length <= 128 ? value.lastName.trim() : '',
+    username: typeof value.username === 'string' && value.username.length <= 64 ? value.username.trim() : '',
+    avatarUrl: null,
+  }
+  if (typeof value.avatarUrl === 'string' && value.avatarUrl.length <= 2_048) {
+    try {
+      const url = new URL(value.avatarUrl)
+      if (url.protocol === 'https:') profile.avatarUrl = url.href
+    } catch {
+      profile.avatarUrl = null
+    }
+  }
+  return profile
 }
 
 export function normalizeServerStats(value) {
@@ -61,14 +81,25 @@ export function normalizeLeaderboard(value) {
       || typeof entry.displayName !== 'string' || !LEADERBOARD_NAME.test(entry.displayName)
       || !Number.isSafeInteger(entry.xp) || entry.xp < 0 || entry.xp > MAX_COUNTER
       || !Number.isSafeInteger(entry.answeredCount) || entry.answeredCount < 0 || entry.answeredCount > MAX_COUNTER
-      || !Number.isSafeInteger(entry.accuracy) || entry.accuracy < 0 || entry.accuracy > 100) return null
+      || !Number.isSafeInteger(entry.accuracy) || entry.accuracy < 0 || entry.accuracy > 100
+      || (entry.avatarUrl !== undefined && entry.avatarUrl !== null && (typeof entry.avatarUrl !== 'string' || entry.avatarUrl.length > 2_048))) return null
     previousRank = entry.rank
+    let avatarUrl = null
+    if (typeof entry.avatarUrl === 'string') {
+      try {
+        const parsed = new URL(entry.avatarUrl)
+        if (parsed.protocol === 'https:') avatarUrl = parsed.href
+      } catch {
+        avatarUrl = null
+      }
+    }
     entries.push({
       rank: entry.rank,
       displayName: entry.displayName,
       xp: entry.xp,
       answeredCount: entry.answeredCount,
       accuracy: entry.accuracy,
+      avatarUrl,
     })
   }
 
@@ -104,6 +135,7 @@ export async function connectTelegram(initData) {
 
     accessToken = data.accessToken
     cloudStats.value = stats
+    cloudProfile.value = normalizeTelegramProfile(data.profile)
     cloudStatus.value = 'ready'
     
     try {
@@ -116,6 +148,7 @@ export async function connectTelegram(initData) {
     return true
   } catch {
     accessToken = null
+    cloudProfile.value = null
     cloudStatus.value = 'error'
     cloudError.value = 'Не удалось проверить сессию Telegram. Прогресс не будет засчитан без ответа сервера.'
     throw invokeFailure()
@@ -181,6 +214,14 @@ export async function fetchLeaderboard() {
   const leaderboard = normalizeLeaderboard(data)
   if (!leaderboard) throw invokeFailure()
   return leaderboard
+}
+
+export async function fetchLeaderboardPreferences() {
+  const data = await invokeAuthenticated({ action: 'get_leaderboard_preferences' })
+  const preferences = data.preferences
+  if (!preferences || typeof preferences.enabled !== 'boolean' || typeof preferences.displayName !== 'string'
+    || (preferences.displayName !== '' && !LEADERBOARD_NAME.test(preferences.displayName))) throw invokeFailure()
+  return { enabled: preferences.enabled, displayName: preferences.displayName }
 }
 
 export async function updateLeaderboardPreferences({ enabled, displayName }) {

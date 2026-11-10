@@ -117,7 +117,7 @@ describe('quiz engine', () => {
     }))
     const migrated = loadProgress(storage)
     expect(migrated.recovered).toBe(false)
-    expect(migrated.progress.version).toBe(2)
+    expect(migrated.progress.version).toBe(4)
     expect(migrated.progress.activeSessions.practice.sessionId).toBeTruthy()
     expect(loadProgress(storage).progress.activeSessions.practice.questionIds).toEqual(['qa-01'])
 
@@ -125,5 +125,21 @@ describe('quiz engine', () => {
     expect(loadProgress(tooLarge).recovered).toBe(true)
     const unsafeCounter = memoryStorage(JSON.stringify({ ...createInitialProgress(), xp: Number.MAX_SAFE_INTEGER + 2 }))
     expect(loadProgress(unsafeCounter).recovered).toBe(true)
+  })
+
+  it('migrates existing lesson progress and initializes achievement dates', () => {
+    const storage = memoryStorage(JSON.stringify({
+      ...createInitialProgress(),
+      version: 3,
+      xp: 150,
+      completedLessonIds: ['basics-qa', 'sql-model'],
+    }))
+
+    const migrated = loadProgress(storage)
+    expect(migrated.recovered).toBe(false)
+    expect(migrated.progress.version).toBe(4)
+    expect(migrated.progress.xp).toBe(150)
+    expect(migrated.progress.completedLessonIds).toEqual(['basics-qa', 'sql-model'])
+    expect(migrated.progress.achievementDates).toEqual({})
   })
 })

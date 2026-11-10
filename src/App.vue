@@ -69,6 +69,12 @@ let removeRouteHook
 let mediaQuery
 const handleSystemTheme = (event) => { systemTheme.value = event.matches ? 'dark' : 'light' }
 
+watch(currentTheme, (theme) => {
+  document.documentElement.dataset.theme = theme
+  const themeColor = document.querySelector('meta[name="theme-color"]')
+  if (themeColor) themeColor.content = theme === 'dark' ? '#171615' : '#fbf4f1'
+}, { immediate: true })
+
 watch(() => route.path, updateTelegramBackButton)
 
 onMounted(() => {

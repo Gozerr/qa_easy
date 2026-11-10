@@ -17,6 +17,7 @@ const selectedOptionId = ref('')
 const hintOpen = ref(false)
 const submissionError = ref('')
 const submitting = ref(false)
+const nextClickLocked = ref(false)
 const session = computed(() => {
   const saved = progress.activeSessions[props.mode] ?? null
   if (cloudStatus.value === 'ready' && saved && !saved.serverVerified) return null
@@ -76,9 +77,12 @@ async function retrySubmit() {
 }
 
 function next() {
+  if (nextClickLocked.value) return
+  nextClickLocked.value = true
   advanceSession(props.mode, props.dailyDate)
   selectedOptionId.value = ''
   hintOpen.value = false
+  window.setTimeout(() => { nextClickLocked.value = false }, 250)
 }
 
 function optionState(optionId) {
@@ -156,7 +160,7 @@ function optionState(optionId) {
             optionState(option.id),
           ]"
           type="button"
-          :disabled="Boolean(existingAnswer)"
+          :disabled="Boolean(existingAnswer) || submitting"
           :aria-pressed="selectedOptionId === option.id || existingAnswer?.selectedOptionId === option.id"
           @click="selectedOptionId = option.id"
         >
@@ -203,7 +207,7 @@ function optionState(optionId) {
       >
         {{ submitting ? 'Отправляем…' : 'Проверить ответ' }} <Check v-if="!submitting" :size="17" aria-hidden="true" />
       </button>
-      <button v-else class="button button-primary quiz-action" type="button" @click="next">
+      <button v-else class="button button-primary quiz-action" type="button" :disabled="nextClickLocked" @click="next">
         {{ session.currentIndex === session.questionIds.length - 1 ? 'К результатам' : 'Следующий вопрос' }}
         <ArrowRight :size="17" aria-hidden="true" />
       </button>

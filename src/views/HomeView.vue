@@ -1,30 +1,42 @@
 <script setup>
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
-import { ArrowRight, Award, BookOpen, Bug, CalendarCheck, Check, ChevronRight, Flame, MessageCircleQuestion, Play, Sparkles, Target } from '@lucide/vue'
+import { ArrowRight, BookOpen, Bug, CalendarCheck, Check, ChevronRight, Flame, MessageCircleQuestion, Play, Sparkles, Trophy } from '@lucide/vue'
 import { useUtcDate } from '../composables/useUtcDate.js'
 import { useQuestionBank } from '../composables/useQuestionBank.js'
 import { useProgress } from '../composables/useProgress.js'
+import UserAvatar from '../components/UserAvatar.vue'
+import MascotMark from '../components/MascotMark.vue'
+import { theoryTopics } from '../data/theory.js'
 
-const { progress, accuracy, currentStreak } = useProgress()
+const { progress, accuracy, currentStreak, cloudProfile } = useProgress()
 const { questions, getDaily } = useQuestionBank()
 const today = useUtcDate()
 const dailyTask = computed(() => getDaily(today.value))
 const dailyQuestion = computed(() => dailyTask.value.question)
 const progressPercent = computed(() => Math.min(100, Math.round((progress.completedQuestionIds.length / questions.length) * 100)))
+const lessonCount = computed(() => theoryTopics.reduce((sum, topic) => sum + topic.lessons.length, 0))
 const dailyDone = computed(() => progress.dailyCompletions.includes(today.value))
 const nextStep = computed(() => progress.answeredCount === 0
   ? { to: '/theory', label: 'Начать с основ', detail: '5 коротких тем для уверенного старта', icon: BookOpen }
   : { to: '/practice', label: 'Продолжить тренировку', detail: progressPercent.value < 100 ? `Открыто ${progress.completedQuestionIds.length} из ${questions.value.length} вопросов` : 'Ты прошёл весь базовый банк — закрепим навыки', icon: Play })
 const level = computed(() => Math.max(1, Math.floor(progress.xp / 100) + 1))
+const greeting = computed(() => {
+  if (!cloudProfile.value?.firstName) return progress.answeredCount ? 'С возвращением!' : 'Привет, тестировщик!'
+  return progress.answeredCount ? `С возвращением, ${cloudProfile.value.firstName}!` : `Привет, ${cloudProfile.value.firstName}!`
+})
+const greetingCopy = computed(() => progress.answeredCount
+  ? 'Продолжим прокачивать QA-навыки?'
+  : 'Начнём путь в QA с короткой практики.')
 const todayLabel = computed(() => new Intl.DateTimeFormat('ru-RU', {
   weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC',
 }).format(new Date(`${today.value}T00:00:00Z`)).toLocaleUpperCase('ru-RU'))
 const featureCards = computed(() => [
-  { to: '/theory', title: 'Теория', subtitle: '5 коротких тем', icon: BookOpen, tone: 'lavender' },
-  { to: '/practice', title: 'Найди багулю', subtitle: '10 ситуаций', icon: Bug, tone: 'mint' },
+  { to: '/theory', title: 'Теория', subtitle: 'Короткие темы и практика', icon: BookOpen, tone: 'sky' },
+  { to: '/practice', title: 'Найди багулю', subtitle: 'Разбирай реальные ситуации', icon: Bug, tone: 'coral' },
   { to: '/interview', title: 'Собеседование', subtitle: 'Junior и Middle', icon: MessageCircleQuestion, tone: 'peach' },
-  { to: '/profile', title: 'Мой прогресс', subtitle: `${progress.xp} XP · ${accuracy}% точность`, icon: Award, tone: 'blue' },
+  { to: '/daily', title: 'QA Daily', subtitle: dailyDone.value ? 'Задание выполнено' : 'Задание на 2 минуты', icon: CalendarCheck, tone: 'blue' },
+  { to: '/leaderboard', title: 'Рейтинг', subtitle: 'Сравни результаты', icon: Trophy, tone: 'coral' },
 ])
 </script>
 
@@ -33,10 +45,12 @@ const featureCards = computed(() => [
     <header class="welcome-heading">
       <div>
         <p class="eyebrow">{{ todayLabel }}</p>
-        <h1>Привет, тестировщик!</h1>
-        <p>Проверим пару гипотез?</p>
+        <h1>{{ greeting }}</h1>
+        <p>{{ greetingCopy }}</p>
       </div>
-      <span class="welcome-mark"><Target :size="21" aria-hidden="true" /></span>
+      <RouterLink to="/profile" aria-label="Открыть профиль">
+        <UserAvatar :src="cloudProfile?.avatarUrl" :name="cloudProfile?.firstName || 'QA'" size="user-avatar-home" />
+      </RouterLink>
     </header>
 
     <RouterLink :to="nextStep.to" class="next-step-card">
@@ -60,7 +74,7 @@ const featureCards = computed(() => [
       <div class="progress-track" role="progressbar" :aria-valuenow="progressPercent" aria-valuemin="0" aria-valuemax="100" aria-label="Прогресс по вопросам">
         <span :style="{ width: `${progressPercent}%` }" />
       </div>
-      <p class="dashboard-progress-foot">{{ progress.completedQuestionIds.length }} из {{ questions.length }} вопросов освоено</p>
+      <p class="dashboard-progress-foot">{{ progress.completedQuestionIds.length }} из {{ questions.length }} вопросов · {{ progress.completedLessonIds.length }} из {{ lessonCount }} уроков</p>
     </section>
 
     <RouterLink class="daily-hero" to="/daily">
@@ -70,7 +84,7 @@ const featureCards = computed(() => [
         <p>{{ dailyTask.prompt }}</p>
         <span class="daily-hero-link">{{ dailyDone ? 'Открыть разбор' : 'Начать задание' }} <ArrowRight :size="17" aria-hidden="true" /></span>
       </div>
-      <span class="daily-hero-art" aria-hidden="true"><CalendarCheck :size="27" /></span>
+      <span class="daily-hero-art"><MascotMark /></span>
       <span class="hero-date"><Check v-if="dailyDone" :size="14" aria-hidden="true" /> {{ today }} · UTC</span>
     </RouterLink>
 
@@ -79,13 +93,13 @@ const featureCards = computed(() => [
     </div>
 
     <div class="feature-grid">
-      <RouterLink v-for="feature in featureCards" :key="feature.to" :to="feature.to" class="feature-card" :class="`feature-${feature.tone}`">
+      <RouterLink v-for="feature in featureCards" :key="feature.to" :to="feature.to" class="feature-card" :class="`feature-${feature.tone}`" :aria-label="feature.to === '/leaderboard' ? 'Таблица лидеров' : undefined">
         <span class="feature-card-icon"><component :is="feature.icon" :size="20" :stroke-width="1.8" aria-hidden="true" /></span>
         <span class="feature-card-copy"><strong>{{ feature.title }}</strong><small>{{ feature.subtitle }}</small></span>
         <ArrowRight :size="16" aria-hidden="true" />
       </RouterLink>
     </div>
 
-    <p class="home-footnote">{{ dailyQuestion.question }}</p>
+    <p class="home-footnote" v-if="dailyQuestion">{{ dailyDone ? 'Отличная работа — короткие занятия помогают знаниям закрепиться.' : 'Несколько минут практики сегодня — ещё один уверенный шаг в QA.' }}</p>
   </div>
 </template>
