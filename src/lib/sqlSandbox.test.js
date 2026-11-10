@@ -50,6 +50,32 @@ describe('read-only SQL learning sandbox', () => {
     expect(runSqlQuery('SELECT users.name, COUNT(*) FROM users LEFT JOIN orders ON users.id = orders.user_id').error).toMatch(/GROUP BY/)
   })
 
+  it('filters grouped results with HAVING by aggregate expression or selected alias', () => {
+    expect(runSqlQuery('SELECT status, COUNT(*) AS order_count FROM orders GROUP BY status HAVING COUNT(*) > 1 ORDER BY status').rows).toEqual([
+      { status: 'pending', order_count: 3 },
+    ])
+    expect(runSqlQuery('SELECT status, SUM(total) AS gross FROM orders GROUP BY status HAVING gross >= 100 ORDER BY gross DESC').rows).toEqual([
+      { status: 'pending', gross: 149.9 },
+      { status: 'paid', gross: 120 },
+    ])
+    expect(runSqlQuery("SELECT status, COUNT(*) AS order_count FROM orders WHERE status != 'cancelled' GROUP BY status HAVING order_count >= 1 ORDER BY status").rows).toHaveLength(2)
+  })
+
+  it('rejects HAVING without groups, unknown aliases and unsupported boolean expressions', () => {
+    expect(runSqlQuery('SELECT status FROM orders HAVING status = \'pending\'').error).toMatch(/HAVING требует/)
+    expect(runSqlQuery('SELECT status, COUNT(*) AS n FROM orders GROUP BY status HAVING missing > 1').error).toMatch(/ссылаться/)
+    expect(runSqlQuery('SELECT status, COUNT(*) AS n FROM orders GROUP BY status HAVING n > 1 OR n = 0').error).toMatch(/HAVING/)
+  })
+
+  it('supports safe one-column IN and NOT IN subqueries with one nesting level', () => {
+    expect(runSqlQuery('SELECT name FROM users WHERE id IN (SELECT user_id FROM orders WHERE total >= 100) ORDER BY name').rows).toEqual([{ name: 'Илья' }])
+    expect(runSqlQuery('SELECT name FROM users WHERE id NOT IN (SELECT user_id FROM orders WHERE total >= 100) ORDER BY name').rows).toEqual([
+      { name: 'Анна' }, { name: 'Мария' }, { name: 'Тимур' },
+    ])
+    expect(runSqlQuery('SELECT id FROM users WHERE id IN (SELECT id, name FROM users)').error).toMatch(/ровно один столбец/)
+    expect(runSqlQuery('SELECT id FROM users WHERE id IN (SELECT user_id FROM orders WHERE user_id IN (SELECT id FROM users))').error).toMatch(/один уровень/)
+  })
+
   it('rejects ambiguous joins, unknown functions, aliases, writes and unsafe expressions', () => {
     expect(runSqlQuery('SELECT id FROM users JOIN orders ON users.id = orders.user_id').error).toMatch(/неоднозначен/)
     expect(runSqlQuery('SELECT users.id, orders.id FROM users JOIN orders ON users.id = orders.user_id WHERE id = 1').error).toMatch(/неоднозначен/)

@@ -148,6 +148,16 @@ test('SQL и API Lab проверяют исправленные данные и
   await page.getByRole('button', { name: 'Выполнить' }).click()
   await expect(page.locator('.lab-result')).toContainText('набор строк и порядок совпали')
 
+  await page.getByRole('button', { name: 'Следующее упражнение' }).click()
+  await page.locator('#sql-query').fill('SELECT status, COUNT(*) AS order_count FROM orders GROUP BY status HAVING COUNT(*) > 1 ORDER BY status')
+  await page.getByRole('button', { name: 'Выполнить' }).click()
+  await expect(page.locator('.lab-result')).toContainText('набор строк и порядок совпали')
+
+  await page.getByRole('button', { name: 'Следующее упражнение' }).click()
+  await page.locator('#sql-query').fill('SELECT name FROM users WHERE id IN (SELECT user_id FROM orders WHERE total >= 100) ORDER BY name')
+  await page.getByRole('button', { name: 'Выполнить' }).click()
+  await expect(page.locator('.lab-result')).toContainText('набор строк и порядок совпали')
+
   await page.getByRole('button', { name: /API Lab/ }).click()
   await page.locator('#api-response').fill(JSON.stringify({ orderId: 'ord-104', status: 'paid', total: 1299, payment: { status: 'paid', amount: 1299 }, currency: 'RUB' }, null, 2))
   await page.getByRole('button', { name: 'Проверить ответ' }).click()
@@ -176,7 +186,7 @@ test('SQL и API Lab проверяют исправленные данные и
   await page.locator('#api-response').fill(JSON.stringify({ deliveries: [{ eventId: 'evt-900', responseStatus: 200 }, { eventId: 'evt-900', responseStatus: 200 }], processedEventIds: ['evt-900'], appliedTransitions: 1, orderStatus: 'paid' }, null, 2))
   await page.getByRole('button', { name: 'Проверить ответ' }).click()
   await expect(page.locator('.lab-result')).toContainText('соответствует проверяемым условиям')
-  await expect.poll(() => page.evaluate(() => Object.keys(JSON.parse(localStorage.getItem('qa-na-paltsakh:progress')).practiceResults).length)).toBe(8)
+  await expect.poll(() => page.evaluate(() => Object.keys(JSON.parse(localStorage.getItem('qa-na-paltsakh:progress')).practiceResults).length)).toBe(10)
 })
 
 test('QA Arena завершает десять вопросов и сохраняет локальный результат без ложного рейтинга', async ({ page }) => {

@@ -14,12 +14,14 @@ export const sqlTables = {
   ],
 }
 
-const SELECT_PATTERN = /^select\s+([\s\S]+?)\s+from\s+(users|orders)(?:\s+(left|inner)?\s*join\s+(users|orders)\s+on\s+([\s\S]+?))?(?:\s+where\s+([\s\S]+?))?(?:\s+group\s+by\s+([\s\S]+?))?(?:\s+order\s+by\s+([\s\S]+?))?(?:\s+limit\s+(\d+))?$/i
+const SELECT_PATTERN = /^select\s+([\s\S]+?)\s+from\s+(users|orders)(?:\s+(left|inner)?\s*join\s+(users|orders)\s+on\s+([\s\S]+?))?(?:\s+where\s+([\s\S]+?))?(?:\s+group\s+by\s+([\s\S]+?))?(?:\s+having\s+([\s\S]+?))?(?:\s+order\s+by\s+([\s\S]+?))?(?:\s+limit\s+(\d+))?$/i
 const SOURCE_COLUMNS = Symbol('source_columns')
 const COLUMN_REF = /^(?:([a-z_][\w]*)\.)?([a-z_][\w]*)$/i
 const CONDITION_PATTERN = /^(?:([a-z_][\w]*\.)?([a-z_][\w]*))\s*(?:(=|!=|>=|<=|>|<)\s*((?:'(?:[^']|'')*')|(?:"(?:[^"]|"")*")|-?\d+(?:\.\d+)?|true|false|null)|(is\s+(?:not\s+)?null))$/i
+const SUBQUERY_CONDITION_PATTERN = /^((?:[a-z_][\w]*\.)?[a-z_][\w]*)\s+(not\s+in|in)\s*\((select[\s\S]+)\)$/i
 const JOIN_PATTERN = /^([a-z_][\w]*)\.([a-z_][\w]*)\s*=\s*([a-z_][\w]*)\.([a-z_][\w]*)$/i
 const AGGREGATE_PATTERN = /^(count|sum|avg)\s*\(\s*(\*|(?:[a-z_][\w]*\.)?[a-z_][\w]*)\s*\)(?:\s+as\s+([a-z_][\w]*))?$/i
+const HAVING_PATTERN = /^(?:(count|sum|avg)\s*\(\s*(\*|(?:[a-z_][\w]*\.)?[a-z_][\w]*)\s*\)|([a-z_][\w]*))\s*(=|!=|>=|<=|>|<)\s*((?:'(?:[^']|'')*')|(?:"(?:[^"]|"")*")|-?\d+(?:\.\d+)?|true|false|null)$/i
 const COLUMN_PATTERN = /^(?:\*|[a-z_][\w]*\.\*|(?:[a-z_][\w]*\.)?[a-z_][\w]*(?:\s+as\s+[a-z_][\w]*)?)$/i
 
 function parseValue(raw) {
@@ -105,6 +107,27 @@ function evaluateCondition(row, rawCondition, tableNames) {
     case '<=': return { passed: actual <= expected }
     default: return { passed: false }
   }
+}
+
+function evaluateSubqueryCondition(row, rawCondition, tableNames, depth) {
+  const match = SUBQUERY_CONDITION_PATTERN.exec(rawCondition.trim())
+  if (!match) return { handled: false }
+  const [, rawColumn, rawOperator, query] = match
+  if (depth >= 1) return { handled: true, error: 'Поддерживается только один уровень вложенного SELECT.' }
+  const resolved = resolveColumn(rawColumn, tableNames)
+  if (resolved.error) return { handled: true, error: resolved.error }
+  const result = executeSqlQuery(query, depth + 1)
+  if (result.error) return { handled: true, error: `Ошибка вложенного SELECT: ${result.error}` }
+  if (result.rows.some((item) => Object.keys(item).length !== 1)) {
+    return { handled: true, error: 'Вложенный SELECT в IN должен возвращать ровно один столбец.' }
+  }
+  const values = result.rows.map((item) => item[Object.keys(item)[0]])
+  const actual = row[resolved.key]
+  if (actual === null || actual === undefined || values.includes(null) || values.includes(undefined)) {
+    return { handled: true, passed: false }
+  }
+  const found = values.includes(actual)
+  return { handled: true, passed: /^not\s+in$/i.test(rawOperator) ? !found : found }
 }
 
 function parseProjection(rawProjection, tableNames) {
@@ -208,14 +231,50 @@ function projectRows(rows, projections, groupBy) {
   }), error: null }
 }
 
-export function runSqlQuery(input) {
+function filterHaving(rows, rawCondition, projections, tableNames) {
+  const condition = HAVING_PATTERN.exec(rawCondition.trim())
+  if (!condition) return { rows: [], error: 'HAVING принимает агрегат или его AS-алиас со сравнением.' }
+  const [, operation, rawColumn, rawAlias, operator, rawValue] = condition
+  let projection
+  if (rawAlias) {
+    projection = projections.find(({ label }) => label === rawAlias.toLowerCase())
+  } else {
+    let key = null
+    if (rawColumn !== '*') {
+      const resolved = resolveColumn(rawColumn, tableNames)
+      if (resolved.error) return { rows: [], error: resolved.error }
+      key = resolved.key
+    }
+    projection = projections.find((item) => item.kind === 'aggregate'
+      && item.operation === operation.toLowerCase()
+      && item.key === key)
+  }
+  if (!projection) return { rows: [], error: 'HAVING должен ссылаться на столбец результата или выбранный агрегат.' }
+  const expected = parseValue(rawValue)
+  const filtered = rows.filter((row) => {
+    const actual = row[projection.label]
+    if (actual === null || actual === undefined || expected === null || expected === undefined) return false
+    switch (operator) {
+      case '=': return actual === expected
+      case '!=': return actual !== expected
+      case '>': return actual > expected
+      case '<': return actual < expected
+      case '>=': return actual >= expected
+      case '<=': return actual <= expected
+      default: return false
+    }
+  })
+  return { rows: filtered, error: null }
+}
+
+function executeSqlQuery(input, depth = 0) {
   if (typeof input !== 'string' || input.length > 1_000) return { rows: [], error: 'Запрос пустой или слишком длинный.' }
   const query = input.trim().replace(/;\s*$/, '')
   if (!query || /;|--|\/\*|\*\//.test(query)) return { rows: [], error: 'Разрешён один SELECT-запрос без комментариев.' }
 
   const match = SELECT_PATTERN.exec(query)
-  if (!match) return { rows: [], error: 'Поддерживается SELECT из users|orders с JOIN, WHERE, GROUP BY, ORDER BY и LIMIT.' }
-  const [, rawProjection, baseTable, rawJoinKind, joinedTable, rawJoin, rawCondition, rawGroupBy, rawOrderBy, rawLimit] = match
+  if (!match) return { rows: [], error: 'Поддерживается SELECT из users|orders с JOIN, WHERE, GROUP BY, HAVING, ORDER BY и LIMIT.' }
+  const [, rawProjection, baseTable, rawJoinKind, joinedTable, rawJoin, rawCondition, rawGroupBy, rawHaving, rawOrderBy, rawLimit] = match
   const base = baseTable.toLowerCase()
   const joined = joinedTable?.toLowerCase()
   const tableNames = joined ? [base, joined] : [base]
@@ -233,6 +292,12 @@ export function runSqlQuery(input) {
   if (rawCondition) {
     const filtered = []
     for (const row of rows) {
+      const subquery = evaluateSubqueryCondition(row, rawCondition, tableNames, depth)
+      if (subquery.error) return { rows: [], error: subquery.error }
+      if (subquery.handled) {
+        if (subquery.passed) filtered.push(row)
+        continue
+      }
       const condition = evaluateCondition(row, rawCondition, tableNames)
       if (condition.error) return { rows: [], error: condition.error }
       if (condition.passed) filtered.push(row)
@@ -255,6 +320,13 @@ export function runSqlQuery(input) {
   const projected = projectRows(rows, projection.projections, groupBy)
   if (projected.error) return projected
   rows = projected.rows
+
+  if (rawHaving) {
+    if (groupBy.length === 0 && !projection.projections.some(({ kind }) => kind === 'aggregate')) return { rows: [], error: 'HAVING требует GROUP BY или агрегатный запрос.' }
+    const filtered = filterHaving(rows, rawHaving, projection.projections, tableNames)
+    if (filtered.error) return filtered
+    rows = filtered.rows
+  }
 
   if (rawOrderBy) {
     const orderColumns = rawOrderBy.split(',').map((part) => {
@@ -285,4 +357,8 @@ export function runSqlQuery(input) {
   }
 
   return { rows, error: null }
+}
+
+export function runSqlQuery(input) {
+  return executeSqlQuery(input)
 }
