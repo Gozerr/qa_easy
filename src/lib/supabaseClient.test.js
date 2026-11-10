@@ -35,15 +35,19 @@ describe('Supabase configuration and response validation', () => {
     expect(normalizeServerStats({ ...valid, dailyCompletions: ['2026-02-30'] })).toBeNull()
   })
 
-  it('validates anonymous skill comparisons and hides averages for small groups', () => {
-    const valid = { categories: [
-      { id: 'fundamentals', personalAccuracy: 80, personalAttempts: 10, communityAverage: 72, communityParticipants: 8 },
-      { id: 'web-api', personalAccuracy: null, personalAttempts: 0, communityAverage: null, communityParticipants: 4 },
-      { id: 'scenarios', personalAccuracy: 50, personalAttempts: 2, communityAverage: null, communityParticipants: 1 },
-    ] }
+  it('validates the ten module progress comparisons and hides small groups', () => {
+    const moduleIds = ['testing-basics', 'documentation', 'test-design', 'test-types', 'web-testing', 'api-testing', 'sql-databases', 'architecture-integrations', 'automation', 'specializations']
+    const valid = { modules: moduleIds.map((id, index) => ({
+      id,
+      personalCompletedLessons: index % 6,
+      lessonCount: 5,
+      communityAveragePercent: index === 0 ? 60 : null,
+      communityParticipants: index === 0 ? 8 : 4,
+    })) }
     expect(normalizeSkillComparison(valid)).toEqual(valid)
-    expect(normalizeSkillComparison({ ...valid, categories: [...valid.categories, valid.categories[0]] })).toBeNull()
-    expect(normalizeSkillComparison({ categories: valid.categories.map((item) => item.id === 'web-api' ? { ...item, communityAverage: 70 } : item) })).toBeNull()
-    expect(normalizeSkillComparison({ categories: valid.categories.map((item) => item.id === 'scenarios' ? { ...item, personalAttempts: 0 } : item) })).toBeNull()
+    expect(normalizeSkillComparison({ modules: [...valid.modules, valid.modules[0]] })).toBeNull()
+    expect(normalizeSkillComparison({ modules: valid.modules.map((item) => item.id === 'documentation' ? { ...item, communityAveragePercent: 70 } : item) })).toBeNull()
+    expect(normalizeSkillComparison({ modules: valid.modules.map((item) => item.id === 'testing-basics' ? { ...item, personalCompletedLessons: 6 } : item) })).toBeNull()
+    expect(normalizeSkillComparison({ modules: valid.modules.slice(1) })).toBeNull()
   })
 })

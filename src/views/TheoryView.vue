@@ -5,13 +5,12 @@ import { BookOpen, Check, ChevronDown, Clock3, Lightbulb, MessageCircleQuestion,
 import PageHeading from '../components/PageHeading.vue'
 import QuizPlayer from '../components/QuizPlayer.vue'
 import { theoryTopics } from '../data/theory.js'
-import { categoryLabels } from '../data/questions.js'
 import { useQuestionBank } from '../composables/useQuestionBank.js'
 import { useProgress } from '../composables/useProgress.js'
 
 const route = useRoute()
 const { getQuestion } = useQuestionBank()
-const { progress, cloudStatus, getSkillComparison, markLessonComplete, recordLessonPractice } = useProgress()
+const { progress, cloudStatus, getSkillComparison, syncCompletedLessons, markLessonComplete, recordLessonPractice } = useProgress()
 const categories = ['Все модули', ...new Set(theoryTopics.map(({ category }) => category))]
 const activeCategory = ref(categories.includes(route.query.category) ? route.query.category : 'Все модули')
 const visibleTopics = computed(() => activeCategory.value === 'Все модули'
@@ -33,6 +32,10 @@ const skillModules = computed(() => theoryTopics.map((topic, index) => {
 const skillComparison = ref(null)
 const skillComparisonLoading = ref(false)
 const skillComparisonError = ref('')
+const skillComparisonModules = computed(() => {
+  const byId = new Map((skillComparison.value?.modules ?? []).map((module) => [module.id, module]))
+  return skillModules.value.map((module) => ({ ...module, comparison: byId.get(module.id) ?? null }))
+})
 let comparisonRequest = 0
 
 async function loadSkillComparison() {
@@ -44,6 +47,7 @@ async function loadSkillComparison() {
   }
   skillComparisonLoading.value = true
   try {
+    await syncCompletedLessons()
     skillComparison.value = await getSkillComparison()
   } catch {
     if (request === comparisonRequest) skillComparisonError.value = 'Не удалось загрузить сравнение навыков.'
@@ -113,19 +117,19 @@ const recallOpen = ref(false)
       <p v-else-if="skillComparisonLoading && !skillComparison" class="skill-comparison-note" role="status">Загружаем сравнение…</p>
       <p v-else-if="skillComparisonError" class="skill-comparison-error" role="alert">{{ skillComparisonError }}</p>
       <div v-else-if="skillComparison" class="skill-comparison-list">
-        <article v-for="skill in skillComparison.categories" :key="skill.id" class="skill-comparison-row">
-          <div class="skill-comparison-label"><strong>{{ categoryLabels[skill.id] }}</strong><span>{{ skill.personalAttempts }} твоих ответов</span></div>
+        <article v-for="skill in skillComparisonModules" :key="skill.id" class="skill-comparison-row">
+          <div class="skill-comparison-label"><strong>{{ skill.title }}</strong><span>{{ skill.comparison?.personalCompletedLessons ?? 0 }}/{{ skill.comparison?.lessonCount ?? 5 }} уроков · {{ skill.percent }}%</span></div>
           <div class="skill-comparison-values">
-            <span>Ты <strong>{{ skill.personalAccuracy === null ? 'пока нет данных' : `${skill.personalAccuracy}%` }}</strong></span>
-            <span>Среднее <strong>{{ skill.communityAverage === null ? `скрыто · ${skill.communityParticipants}/5` : `${skill.communityAverage}%` }}</strong></span>
+            <span>Твой прогресс <strong>{{ skill.percent }}%</strong></span>
+            <span>Среднее <strong>{{ skill.comparison?.communityAveragePercent === null ? `скрыто · ${skill.comparison.communityParticipants}/5` : `${skill.comparison?.communityAveragePercent ?? 0}%` }}</strong></span>
           </div>
           <div class="skill-comparison-bars" aria-hidden="true">
-            <span class="skill-comparison-personal"><i :style="{ width: `${skill.personalAccuracy ?? 0}%` }" /></span>
-            <span class="skill-comparison-community"><i :style="{ width: `${skill.communityAverage ?? 0}%` }" /></span>
+            <span class="skill-comparison-personal"><i :style="{ width: `${skill.percent}%` }" /></span>
+            <span class="skill-comparison-community"><i :style="{ width: `${skill.comparison?.communityAveragePercent ?? 0}%` }" /></span>
           </div>
         </article>
       </div>
-      <p class="skill-comparison-footnote">Среднее показывается только при пяти и более участниках по теме. Имена и индивидуальные ответы других пользователей не передаются.</p>
+      <p class="skill-comparison-footnote">Средний прогресс по модулю показывается только при пяти и более участниках рейтинга. Имена и индивидуальные данные других пользователей не передаются.</p>
     </section>
 
     <div class="filter-tabs" role="group" aria-label="Фильтр учебных модулей">

@@ -282,26 +282,25 @@ export async function fetchCloudXpHistory(limit = 50) {
   return transactions
 }
 
-const SKILL_CATEGORIES = new Set(['fundamentals', 'web-api', 'scenarios'])
+const SKILL_MODULE_IDS = ['testing-basics', 'documentation', 'test-design', 'test-types', 'web-testing', 'api-testing', 'sql-databases', 'architecture-integrations', 'automation', 'specializations']
 
 export function normalizeSkillComparison(value) {
-  if (!value || typeof value !== 'object' || !Array.isArray(value.categories) || value.categories.length !== 3) return null
+  if (!value || typeof value !== 'object' || !Array.isArray(value.modules) || value.modules.length !== SKILL_MODULE_IDS.length) return null
   const seen = new Set()
-  const categories = []
-  for (const item of value.categories) {
-    if (!item || !SKILL_CATEGORIES.has(item.id) || seen.has(item.id)
-      || !Number.isSafeInteger(item.personalAttempts) || item.personalAttempts < 0 || item.personalAttempts > MAX_COUNTER
+  const modules = []
+  for (const item of value.modules) {
+    if (!item || !SKILL_MODULE_IDS.includes(item.id) || seen.has(item.id)
+      || !Number.isSafeInteger(item.personalCompletedLessons) || item.personalCompletedLessons < 0 || item.personalCompletedLessons > 5
+      || !Number.isSafeInteger(item.lessonCount) || item.lessonCount !== 5 || item.personalCompletedLessons > item.lessonCount
       || !Number.isSafeInteger(item.communityParticipants) || item.communityParticipants < 0 || item.communityParticipants > MAX_COUNTER
-      || (item.personalAccuracy !== null && (!Number.isSafeInteger(item.personalAccuracy) || item.personalAccuracy < 0 || item.personalAccuracy > 100))
-      || (item.communityAverage !== null && (!Number.isSafeInteger(item.communityAverage) || item.communityAverage < 0 || item.communityAverage > 100))
-      || (item.personalAttempts === 0) !== (item.personalAccuracy === null)
-      || (item.communityParticipants < 5 && item.communityAverage !== null)
-      || (item.communityParticipants >= 5 && item.communityAverage === null)) return null
+      || (item.communityAveragePercent !== null && (!Number.isSafeInteger(item.communityAveragePercent) || item.communityAveragePercent < 0 || item.communityAveragePercent > 100))
+      || (item.communityParticipants < 5 && item.communityAveragePercent !== null)
+      || (item.communityParticipants >= 5 && item.communityAveragePercent === null)) return null
     seen.add(item.id)
-    categories.push({ ...item })
+    modules.push({ ...item })
   }
-  if (seen.size !== SKILL_CATEGORIES.size) return null
-  return { categories }
+  if (seen.size !== SKILL_MODULE_IDS.length) return null
+  return { modules }
 }
 
 export async function fetchSkillComparison() {
@@ -309,6 +308,14 @@ export async function fetchSkillComparison() {
   const comparison = normalizeSkillComparison(data)
   if (!comparison) throw invokeFailure()
   return comparison
+}
+
+export async function saveCloudLessonProgress(lessonIds) {
+  if (!Array.isArray(lessonIds) || lessonIds.length < 1 || lessonIds.length > 50
+    || !lessonIds.every((id) => SAFE_ID.test(id)) || new Set(lessonIds).size !== lessonIds.length) throw invokeFailure()
+  const data = await invokeAuthenticated({ action: 'save_lesson_progress', lessonIds })
+  if (!Number.isSafeInteger(data.savedCount) || data.savedCount !== lessonIds.length) throw invokeFailure()
+  return { savedCount: data.savedCount }
 }
 
 const ARENA_CHALLENGES = new Set(['scenario-investigation', 'fundamentals', 'web-api'])

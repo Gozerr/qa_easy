@@ -3,7 +3,7 @@ import { createId, createSession, validateAnswer } from '../lib/quizEngine.js'
 import { createInitialProgress, loadProgress, resetProgress, saveProgress } from '../lib/progressStorage.js'
 import { utcDateKey } from '../lib/dailyTask.js'
 import { theoryTopics } from '../data/theory.js'
-import { claimCloudWeeklyMission, cloudProfile, cloudStats, cloudStatus, connectTelegram, createCloudQuizSession, fetchArenaLeaderboard as fetchCloudArenaLeaderboard, fetchCloudXpHistory, fetchSkillComparison as fetchCloudSkillComparison, fetchWeeklyMissions, getAuthenticatedTelegramInitData, isServerScoringRequired, resetCloudProgress, serverScoringIsActive, submitCloudArenaResult, submitCloudAttempt } from '../lib/cloudApi.js'
+import { claimCloudWeeklyMission, cloudProfile, cloudStats, cloudStatus, connectTelegram, createCloudQuizSession, fetchArenaLeaderboard as fetchCloudArenaLeaderboard, fetchCloudXpHistory, fetchSkillComparison as fetchCloudSkillComparison, fetchWeeklyMissions, getAuthenticatedTelegramInitData, isServerScoringRequired, resetCloudProgress, saveCloudLessonProgress, serverScoringIsActive, submitCloudArenaResult, submitCloudAttempt } from '../lib/cloudApi.js'
 
 const SAFE_LESSON_ID = /^[a-z0-9][a-z0-9-]{0,79}$/
 const SAFE_ACTIVITY_ID = /^[a-z0-9][a-z0-9-]{0,79}$/
@@ -97,7 +97,18 @@ watch(achievements, (items, previousItems) => {
 function markLessonComplete(lessonId) {
   if (typeof lessonId !== 'string' || !SAFE_LESSON_ID.test(lessonId)) return false
   if (!progress.completedLessonIds.includes(lessonId)) progress.completedLessonIds.push(lessonId)
+  if (serverScoringIsActive()) void saveCloudLessonProgress([lessonId]).catch(() => {})
   return true
+}
+
+async function syncCompletedLessons() {
+  if (!serverScoringIsActive() || progress.completedLessonIds.length === 0) return false
+  try {
+    await saveCloudLessonProgress(progress.completedLessonIds)
+    return true
+  } catch {
+    return false
+  }
 }
 
 function recordLessonPractice(lessonId, response) {
@@ -376,6 +387,7 @@ export function useProgress() {
     claimWeeklyMission,
     getXpHistory,
     getSkillComparison,
+    syncCompletedLessons,
     getArenaLeaderboard,
     submitArenaResult,
     authenticateTelegram,

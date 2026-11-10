@@ -214,6 +214,7 @@ test('собеседование переключает набор, а теор�
 
   await page.goto('theory?category=Web%20%D0%B8%20API')
   await expect(page.locator('.skill-comparison')).toContainText('Сравнение навыков')
+  await expect(page.locator('.skill-node')).toHaveCount(10)
   await expect(page.locator('.skill-comparison-note')).toContainText('подтверждённой сессии Telegram')
   await expect(page.locator('.theory-topic')).toHaveCount(1)
   await expect(page.locator('#web-testing').getByText('Web-тестирование', { exact: true })).toBeVisible()

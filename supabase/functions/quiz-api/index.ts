@@ -217,7 +217,20 @@ Deno.serve(async (request: Request) => {
     }
     if (body.action === 'get_skill_comparison') {
       const { data, error } = await client.rpc('get_skill_comparison', { p_telegram_user_id: telegramUserId })
-      if (error || !data || !Array.isArray(data.categories)) throw new Error('Skill comparison unavailable')
+      if (error || !data || !Array.isArray(data.modules)) throw new Error('Skill comparison unavailable')
+      return jsonResponse(request, data)
+    }
+    if (body.action === 'save_lesson_progress') {
+      if (!Array.isArray(body.lessonIds) || body.lessonIds.length < 1 || body.lessonIds.length > 50
+        || !body.lessonIds.every((id) => typeof id === 'string' && QUESTION_ID.test(id))
+        || new Set(body.lessonIds).size !== body.lessonIds.length) {
+        return jsonResponse(request, { error: 'Некорректный прогресс уроков.' }, 400)
+      }
+      const { data, error } = await client.rpc('save_lesson_progress', {
+        p_telegram_user_id: telegramUserId,
+        p_lesson_ids: body.lessonIds,
+      })
+      if (error || !data || data.savedCount !== body.lessonIds.length) throw new Error('Lesson progress persistence failed')
       return jsonResponse(request, data)
     }
     if (body.action === 'get_arena_leaderboard') {
