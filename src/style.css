@@ -924,6 +924,22 @@ button:focus-visible, a:focus-visible, summary:focus-visible { outline: 3px soli
 .achievement-row .achievement-status { padding-top: 5px; }
 .achievement-empty { margin: 0; padding: 20px 15px; color: var(--muted); font-size: 12px; line-height: 1.55; text-align: center; }
 
+.season-awards { display: grid; gap: 12px; margin-bottom: 24px; }
+.season-awards-count { align-self: center; color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.season-awards-note { margin: -5px 0 0; color: var(--muted); font-size: 10px; line-height: 1.5; }
+.season-awards-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+.season-award-card { display: grid; align-content: start; gap: 7px; min-width: 0; padding: 12px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); }
+.season-award-card.is-earned { border-color: color-mix(in srgb, var(--success) 45%, var(--line)); }
+.season-award-icon { display: grid; width: 32px; height: 32px; place-items: center; border-radius: 11px; color: var(--accent); background: var(--accent-soft); }
+.season-award-card strong { font-size: 11px; line-height: 1.3; }
+.season-award-card small { min-height: 26px; color: var(--muted); font-size: 9px; line-height: 1.45; }
+.season-award-progress, .season-award-state { color: var(--muted); font-size: 9px; font-variant-numeric: tabular-nums; }
+.season-award-bar { height: 4px; overflow: hidden; border-radius: 99px; background: var(--surface-secondary); }
+.season-award-bar > span { display: block; height: 100%; border-radius: inherit; background: var(--line-strong); transition: width 250ms ease; }
+.season-award-card.is-earned .season-award-bar > span { background: var(--success); }
+.season-award-card.is-earned .season-award-state { color: var(--success); }
+@media (min-width: 700px) { .season-awards-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+
 @media (max-width: 420px) {
   .achievement-row { gap: 8px; padding-inline: 9px; }
   .achievement-status { max-width: 43px; text-align: right; white-space: normal; }

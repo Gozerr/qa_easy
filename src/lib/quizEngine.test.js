@@ -125,7 +125,7 @@ describe('quiz engine', () => {
     }))
     const migrated = loadProgress(storage)
     expect(migrated.recovered).toBe(false)
-    expect(migrated.progress.version).toBe(7)
+    expect(migrated.progress.version).toBe(8)
     expect(migrated.progress.activeSessions.practice.sessionId).toBeTruthy()
     expect(loadProgress(storage).progress.activeSessions.practice.questionIds).toEqual(['qa-01'])
 
@@ -145,7 +145,7 @@ describe('quiz engine', () => {
 
     const migrated = loadProgress(storage)
     expect(migrated.recovered).toBe(false)
-    expect(migrated.progress.version).toBe(7)
+    expect(migrated.progress.version).toBe(8)
     expect(migrated.progress.xp).toBe(150)
     expect(migrated.progress.completedLessonIds).toEqual(['basics-qa', 'sql-model'])
     expect(migrated.progress.achievementDates).toEqual({})
@@ -165,6 +165,30 @@ describe('quiz engine', () => {
     const invalid = { ...createInitialProgress(), lessonPractices: { 'basics-qa': { scenario: '', steps: 'Действие', expected: 'Результат', completedAt: '2026-11-10T10:00:00.000Z' } } }
     expect(saveProgress(invalid, memoryStorage())).toBe(true)
     expect(loadProgress(memoryStorage(JSON.stringify(invalid))).progress.lessonPractices).toEqual({})
+  })
+
+  it('migrates schema v7 and validates season reward records', () => {
+    const storage = memoryStorage(JSON.stringify({
+      ...createInitialProgress(),
+      version: 7,
+      seasonalResults: {
+        '2026-11': {
+          'arena-scenarios': { bestScore: 80, completedAt: '2026-11-10T10:00:00.000Z' },
+          'marathon-sql': { bestScore: 75, completedAt: '2026-11-10T10:00:00.000Z' },
+          'unsafe-id': { bestScore: 100, completedAt: '2026-11-10T10:00:00.000Z' },
+        },
+        invalid: { 'arena-scenarios': { bestScore: 100, completedAt: '2026-11-10T10:00:00.000Z' } },
+      },
+    }))
+    const migrated = loadProgress(storage)
+    expect(migrated.recovered).toBe(false)
+    expect(migrated.progress.version).toBe(8)
+    expect(migrated.progress.seasonalResults).toEqual({
+      '2026-11': {
+        'arena-scenarios': { bestScore: 80, completedAt: '2026-11-10T10:00:00.000Z' },
+        'marathon-sql': { bestScore: 75, completedAt: '2026-11-10T10:00:00.000Z' },
+      },
+    })
   })
 
   it('keeps bounded, validated XP transactions during local storage round trips', () => {

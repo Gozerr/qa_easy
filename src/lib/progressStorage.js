@@ -1,7 +1,7 @@
 import { createId } from './quizEngine.js'
 
 export const STORAGE_KEY = 'qa-na-paltsakh:progress'
-export const STORAGE_VERSION = 7
+export const STORAGE_VERSION = 8
 
 const MAX_STORAGE_CHARS = 256_000
 const MAX_COUNT = 1_000_000_000
@@ -39,6 +39,7 @@ export function createInitialProgress() {
     completedLessonIds: [],
     achievementDates: {},
     practiceResults: {},
+    seasonalResults: {},
     lessonPractices: {},
     xpTransactions: [],
     theme: 'system',
@@ -54,7 +55,7 @@ function browserStorage() {
 }
 
 function normalizeProgress(value) {
-  if (!value || ![1, 2, 3, 4, 5, 6, STORAGE_VERSION].includes(value.version)) return null
+  if (!value || ![1, 2, 3, 4, 5, 6, 7, STORAGE_VERSION].includes(value.version)) return null
   const migrating = value.version < STORAGE_VERSION
   if (!Number.isSafeInteger(value.xp) || !Number.isSafeInteger(value.answeredCount) || !Number.isSafeInteger(value.correctCount)) return null
   if (value.xp < 0 || value.answeredCount < 0 || value.correctCount < 0 || value.correctCount > value.answeredCount) return null
@@ -69,6 +70,7 @@ function normalizeProgress(value) {
   if (value.achievementDates && (typeof value.achievementDates !== 'object' || Array.isArray(value.achievementDates) || Object.keys(value.achievementDates).length > 100)) return null
   if (value.version === STORAGE_VERSION && (!value.practiceResults || typeof value.practiceResults !== 'object' || Array.isArray(value.practiceResults))) return null
   if (value.practiceResults && (typeof value.practiceResults !== 'object' || Array.isArray(value.practiceResults) || Object.keys(value.practiceResults).length > 1_000)) return null
+  if (value.seasonalResults && (typeof value.seasonalResults !== 'object' || Array.isArray(value.seasonalResults) || Object.keys(value.seasonalResults).length > 120)) return null
   if (value.version === STORAGE_VERSION && (!value.lessonPractices || typeof value.lessonPractices !== 'object' || Array.isArray(value.lessonPractices))) return null
   if (value.lessonPractices && (typeof value.lessonPractices !== 'object' || Array.isArray(value.lessonPractices) || Object.keys(value.lessonPractices).length > 1_000)) return null
   if (value.version === STORAGE_VERSION && (!Array.isArray(value.xpTransactions) || value.xpTransactions.length > MAX_XP_TRANSACTIONS)) return null
@@ -153,6 +155,14 @@ function normalizeProgress(value) {
       if (!SAFE_ID.test(id) || !result || typeof result !== 'object') return []
       if (!Number.isInteger(result.bestScore) || result.bestScore < 0 || result.bestScore > 100 || !isIsoTimestamp(result.completedAt)) return []
       return [[id, { bestScore: result.bestScore, completedAt: result.completedAt }]]
+    })),
+    seasonalResults: Object.fromEntries(Object.entries(value.seasonalResults ?? {}).flatMap(([season, results]) => {
+      if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(season) || !results || typeof results !== 'object' || Array.isArray(results)) return []
+      const clean = Object.fromEntries(Object.entries(results).flatMap(([id, result]) => {
+        if (!/^arena-scenarios$|^marathon-[a-z0-9-]{1,60}$/.test(id) || !result || !Number.isInteger(result.bestScore) || result.bestScore < 0 || result.bestScore > 100 || !isIsoTimestamp(result.completedAt)) return []
+        return [[id, { bestScore: result.bestScore, completedAt: result.completedAt }]]
+      }))
+      return [[season, clean]]
     })),
     lessonPractices: Object.fromEntries(Object.entries(value.lessonPractices ?? {}).flatMap(([id, result]) => {
       if (!SAFE_ID.test(id) || !result || typeof result !== 'object' || !isIsoTimestamp(result.completedAt)) return []

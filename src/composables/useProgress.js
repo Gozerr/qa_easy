@@ -128,6 +128,14 @@ function recordPracticeResult(activityId, score) {
   if (!current || score > current.bestScore) {
     progress.practiceResults[activityId] = { bestScore: score, completedAt: new Date().toISOString() }
   }
+  if (activityId === 'arena-scenarios' || activityId.startsWith('marathon-')) {
+    const completedAt = new Date().toISOString()
+    const season = completedAt.slice(0, 7)
+    const results = progress.seasonalResults[season] ??= {}
+    const seasonal = results[activityId]
+    results[activityId] = { bestScore: Math.max(seasonal?.bestScore ?? 0, score), completedAt }
+    for (const oldSeason of Object.keys(progress.seasonalResults).sort().slice(0, -12)) delete progress.seasonalResults[oldSeason]
+  }
   return true
 }
 
