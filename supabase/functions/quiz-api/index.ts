@@ -4,6 +4,11 @@ import { verifySessionToken } from '../_shared/sessionToken.ts'
 const QUESTION_ID = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}$/
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 const CATEGORIES = new Set(['fundamentals', 'web-api', 'scenarios'])
+const MARATHON_CATEGORY = new Map([
+  ['marathon-fundamentals', 'fundamentals'],
+  ['marathon-web-api', 'web-api'],
+  ['marathon-scenarios', 'scenarios'],
+])
 const DIFFICULTIES = new Set(['Начальный', 'Средний', 'Сложный'])
 const LEADERBOARD_NAME = /^[\p{L}\p{N}][\p{L}\p{N} _-]{1,23}$/u
 
@@ -100,7 +105,7 @@ async function getDailyTask(client: ReturnType<typeof createServiceClient>) {
 async function createQuizSession(client: ReturnType<typeof createServiceClient>, userId: string, body: Record<string, unknown>) {
   const mode = body.mode
   const requestedSize = body.size
-  if (!['practice', 'interview-junior', 'interview-middle', 'theory', 'daily'].includes(String(mode))
+  if (!['practice', 'interview-junior', 'interview-middle', 'theory', 'daily'].includes(String(mode)) && !MARATHON_CATEGORY.has(String(mode))
     || !Number.isSafeInteger(requestedSize) || Number(requestedSize) < 1 || Number(requestedSize) > 10) {
     return { error: 'Некорректный формат тренировки.' }
   }
@@ -108,6 +113,8 @@ async function createQuizSession(client: ReturnType<typeof createServiceClient>,
   const size = mode === 'theory' || mode === 'daily' ? 1 : Number(requestedSize)
   let query = client.from('questions').select('id,options').eq('is_active', true)
   if (mode === 'practice') query = query.eq('category', 'scenarios')
+  const marathonCategory = MARATHON_CATEGORY.get(String(mode))
+  if (marathonCategory) query = query.eq('category', marathonCategory)
   if (mode === 'interview-junior') query = query.eq('interview_level', 'junior')
   if (mode === 'interview-middle') query = query.eq('interview_level', 'middle')
   if (mode === 'theory') {
@@ -172,6 +179,74 @@ Deno.serve(async (request: Request) => {
       const { data, error } = await client.rpc('get_user_stats', { p_telegram_user_id: telegramUserId })
       if (error || !data) throw new Error('Progress retrieval failed')
       return jsonResponse(request, { progress: data })
+    }
+    if (body.action === 'get_weekly_missions') {
+      if (typeof body.weekStart !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(body.weekStart)) {
+        return jsonResponse(request, { error: 'Некорректная неделя.' }, 400)
+      }
+      const { data, error } = await client.rpc('get_weekly_missions', {
+        p_telegram_user_id: telegramUserId,
+        p_week_start: body.weekStart,
+      })
+      if (error || !data) throw new Error('Weekly missions unavailable')
+      return jsonResponse(request, data)
+    }
+    if (body.action === 'claim_weekly_mission') {
+      if (typeof body.weekStart !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(body.weekStart)
+        || !['daily-3', 'answers-10', 'accuracy-80'].includes(body.missionId)) {
+        return jsonResponse(request, { error: 'Некорректная недельная миссия.' }, 400)
+      }
+      const { data, error } = await client.rpc('claim_weekly_mission', {
+        p_telegram_user_id: telegramUserId,
+        p_week_start: body.weekStart,
+        p_mission_id: body.missionId,
+      })
+      if (error || !data) throw new Error('Weekly mission claim failed')
+      return jsonResponse(request, data)
+    }
+    if (body.action === 'get_xp_history') {
+      if (typeof body.limit !== 'number' || !Number.isSafeInteger(body.limit) || body.limit < 1 || body.limit > 100) {
+        return jsonResponse(request, { error: 'Некорректный размер истории.' }, 400)
+      }
+      const { data, error } = await client.rpc('get_xp_history', {
+        p_telegram_user_id: telegramUserId,
+        p_limit: body.limit,
+      })
+      if (error || !data || !Array.isArray(data.transactions)) throw new Error('XP history unavailable')
+      return jsonResponse(request, data)
+    }
+    if (body.action === 'get_skill_comparison') {
+      const { data, error } = await client.rpc('get_skill_comparison', { p_telegram_user_id: telegramUserId })
+      if (error || !data || !Array.isArray(data.categories)) throw new Error('Skill comparison unavailable')
+      return jsonResponse(request, data)
+    }
+    if (body.action === 'get_arena_leaderboard') {
+      if (!['scenario-investigation', 'fundamentals', 'web-api'].includes(String(body.challengeId))) {
+        return jsonResponse(request, { error: 'Неизвестное испытание.' }, 400)
+      }
+      const { data, error } = await client.rpc('get_arena_leaderboard', {
+        p_telegram_user_id: telegramUserId,
+        p_challenge_id: body.challengeId,
+      })
+      if (error || !data) throw new Error('Arena leaderboard unavailable')
+      return jsonResponse(request, data)
+    }
+    if (body.action === 'submit_arena_result') {
+      if (typeof body.sessionId !== 'string' || !UUID.test(body.sessionId)
+        || !['scenario-investigation', 'fundamentals', 'web-api'].includes(String(body.challengeId))
+        || !Array.isArray(body.attemptIds) || body.attemptIds.length !== 10
+        || !body.attemptIds.every((id) => typeof id === 'string' && UUID.test(id))
+        || new Set(body.attemptIds).size !== 10) {
+        return jsonResponse(request, { error: 'Некорректный результат испытания.' }, 400)
+      }
+      const { data, error } = await client.rpc('submit_arena_result', {
+        p_telegram_user_id: telegramUserId,
+        p_session_id: body.sessionId,
+        p_attempt_ids: body.attemptIds,
+        p_challenge_id: body.challengeId,
+      })
+      if (error || !data || typeof data.accepted !== 'boolean' || !data.leaderboard) throw new Error('Arena result unavailable')
+      return jsonResponse(request, data)
     }
     if (body.action === 'get_leaderboard_preferences') {
       const { data: profile, error } = await client.from('profiles')

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { getSupabaseConfig } from './supabaseClient.js'
-import { normalizeServerStats } from './cloudApi.js'
+import { normalizeServerStats, normalizeSkillComparison } from './cloudApi.js'
 
 describe('Supabase configuration and response validation', () => {
   it('handles missing environment values without throwing', () => {
@@ -33,5 +33,17 @@ describe('Supabase configuration and response validation', () => {
     expect(normalizeServerStats({ ...valid, correctCount: 3 })).toBeNull()
     expect(normalizeServerStats({ ...valid, xp: Number.MAX_SAFE_INTEGER + 2 })).toBeNull()
     expect(normalizeServerStats({ ...valid, dailyCompletions: ['2026-02-30'] })).toBeNull()
+  })
+
+  it('validates anonymous skill comparisons and hides averages for small groups', () => {
+    const valid = { categories: [
+      { id: 'fundamentals', personalAccuracy: 80, personalAttempts: 10, communityAverage: 72, communityParticipants: 8 },
+      { id: 'web-api', personalAccuracy: null, personalAttempts: 0, communityAverage: null, communityParticipants: 4 },
+      { id: 'scenarios', personalAccuracy: 50, personalAttempts: 2, communityAverage: null, communityParticipants: 1 },
+    ] }
+    expect(normalizeSkillComparison(valid)).toEqual(valid)
+    expect(normalizeSkillComparison({ ...valid, categories: [...valid.categories, valid.categories[0]] })).toBeNull()
+    expect(normalizeSkillComparison({ categories: valid.categories.map((item) => item.id === 'web-api' ? { ...item, communityAverage: 70 } : item) })).toBeNull()
+    expect(normalizeSkillComparison({ categories: valid.categories.map((item) => item.id === 'scenarios' ? { ...item, personalAttempts: 0 } : item) })).toBeNull()
   })
 })

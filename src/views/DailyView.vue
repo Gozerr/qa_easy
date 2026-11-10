@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { CalendarCheck, Check, Clock3, Globe2 } from '@lucide/vue'
 import PageHeading from '../components/PageHeading.vue'
 import QuizPlayer from '../components/QuizPlayer.vue'
+import WeeklyMissionsPanel from '../components/WeeklyMissionsPanel.vue'
 import { useUtcDate } from '../composables/useUtcDate.js'
 import { useProgress } from '../composables/useProgress.js'
 import { useQuestionBank } from '../composables/useQuestionBank.js'
@@ -35,5 +36,6 @@ const dateLabel = computed(() => new Intl.DateTimeFormat('ru-RU', { day: 'numeri
 
     <p class="daily-expectation">Сначала выбери вариант, затем открой разбор. Задание меняется в 00:00 UTC.</p>
     <QuizPlayer :mode="`daily-${date}`" :pool="[question]" :size="1" :daily-date="date" start-label="Взяться за задачу" />
+    <WeeklyMissionsPanel :today="date" />
   </div>
 </template>

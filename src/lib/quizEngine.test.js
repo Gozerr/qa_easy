@@ -4,6 +4,7 @@ import { getDailyTask } from './dailyTask.js'
 import { createInitialProgress, loadProgress, saveProgress, STORAGE_KEY } from './progressStorage.js'
 import { categories, questions } from '../data/questions.js'
 import { dailyTasks } from '../data/dailyTasks.js'
+import { theoryTopics } from '../data/theory.js'
 
 function createQuestions(count) {
   return Array.from({ length: count }, (_, index) => ({
@@ -50,6 +51,13 @@ describe('quiz engine', () => {
     expect(dailyTasks).toHaveLength(30)
     expect(new Set(dailyTasks.map(({ id }) => id)).size).toBe(30)
     expect(dailyTasks.every(({ title, prompt, questionId }) => title && prompt && questions.some(({ id }) => id === questionId))).toBe(true)
+  })
+
+  it('provides lesson material needed for a practical task in all 50 lessons', () => {
+    const lessons = theoryTopics.flatMap(({ lessons: moduleLessons }) => moduleLessons)
+    expect(lessons).toHaveLength(50)
+    expect(new Set(lessons.map(({ id }) => id)).size).toBe(50)
+    expect(lessons.every(({ id, heading, example, pitfall }) => id && heading && example && pitfall)).toBe(true)
   })
 
   it('shuffles with Fisher–Yates while preserving every item', () => {
@@ -117,7 +125,7 @@ describe('quiz engine', () => {
     }))
     const migrated = loadProgress(storage)
     expect(migrated.recovered).toBe(false)
-    expect(migrated.progress.version).toBe(4)
+    expect(migrated.progress.version).toBe(7)
     expect(migrated.progress.activeSessions.practice.sessionId).toBeTruthy()
     expect(loadProgress(storage).progress.activeSessions.practice.questionIds).toEqual(['qa-01'])
 
@@ -130,16 +138,45 @@ describe('quiz engine', () => {
   it('migrates existing lesson progress and initializes achievement dates', () => {
     const storage = memoryStorage(JSON.stringify({
       ...createInitialProgress(),
-      version: 3,
+      version: 6,
       xp: 150,
       completedLessonIds: ['basics-qa', 'sql-model'],
     }))
 
     const migrated = loadProgress(storage)
     expect(migrated.recovered).toBe(false)
-    expect(migrated.progress.version).toBe(4)
+    expect(migrated.progress.version).toBe(7)
     expect(migrated.progress.xp).toBe(150)
     expect(migrated.progress.completedLessonIds).toEqual(['basics-qa', 'sql-model'])
     expect(migrated.progress.achievementDates).toEqual({})
+    expect(migrated.progress.lessonPractices).toEqual({})
+    expect(migrated.progress.xpTransactions).toEqual([])
+  })
+
+  it('round-trips lesson practice responses and rejects incomplete or oversized records', () => {
+    const valid = {
+      ...createInitialProgress(),
+      lessonPractices: { 'basics-qa': { scenario: 'Повторить запрос', steps: 'Отправить дважды', expected: 'Создан один заказ', completedAt: '2026-11-10T10:00:00.000Z' } },
+    }
+    const storage = memoryStorage()
+    expect(saveProgress(valid, storage)).toBe(true)
+    expect(loadProgress(storage).progress.lessonPractices).toEqual(valid.lessonPractices)
+
+    const invalid = { ...createInitialProgress(), lessonPractices: { 'basics-qa': { scenario: '', steps: 'Действие', expected: 'Результат', completedAt: '2026-11-10T10:00:00.000Z' } } }
+    expect(saveProgress(invalid, memoryStorage())).toBe(true)
+    expect(loadProgress(memoryStorage(JSON.stringify(invalid))).progress.lessonPractices).toEqual({})
+  })
+
+  it('keeps bounded, validated XP transactions during local storage round trips', () => {
+    const storage = memoryStorage()
+    const progress = {
+      ...createInitialProgress(),
+      xpTransactions: [{ id: 'attempt-1', source: 'answer', title: 'Проверка границ', amount: 10, createdAt: '2026-11-10T10:00:00.000Z' }],
+    }
+    expect(saveProgress(progress, storage)).toBe(true)
+    expect(loadProgress(storage).progress.xpTransactions).toEqual(progress.xpTransactions)
+
+    const malformed = { ...progress, xpTransactions: [{ ...progress.xpTransactions[0], amount: -100 }] }
+    expect(loadProgress(memoryStorage(JSON.stringify(malformed))).progress.xpTransactions).toEqual([])
   })
 })

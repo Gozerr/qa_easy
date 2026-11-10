@@ -240,6 +240,127 @@ export async function refreshCloudProgress() {
   return stats
 }
 
+export async function fetchWeeklyMissions(weekStart) {
+  if (!validDate(weekStart)) throw invokeFailure()
+  const data = await invokeAuthenticated({ action: 'get_weekly_missions', weekStart })
+  const validIds = ['daily-3', 'answers-10', 'accuracy-80']
+  if (data.weekStart !== weekStart || !Array.isArray(data.missions) || data.missions.length !== validIds.length) throw invokeFailure()
+  const missions = data.missions.map((mission) => {
+    if (!mission || !validIds.includes(mission.id) || typeof mission.title !== 'string' || mission.title.length > 100
+      || typeof mission.description !== 'string' || mission.description.length > 240
+      || !Number.isSafeInteger(mission.progress) || mission.progress < 0 || mission.progress > 1_000_000
+      || !Number.isSafeInteger(mission.target) || mission.target < 1 || mission.target > 1_000_000
+      || typeof mission.eligible !== 'boolean' || typeof mission.claimed !== 'boolean'
+      || !Number.isSafeInteger(mission.rewardXp) || mission.rewardXp < 1 || mission.rewardXp > 500) throw invokeFailure()
+    return { id: mission.id, title: mission.title, description: mission.description, progress: mission.progress, target: mission.target, eligible: mission.eligible, claimed: mission.claimed, rewardXp: mission.rewardXp }
+  })
+  if (new Set(missions.map(({ id }) => id)).size !== validIds.length) throw invokeFailure()
+  return { weekStart: data.weekStart, missions }
+}
+
+export async function claimCloudWeeklyMission({ missionId, weekStart }) {
+  if (!validDate(weekStart) || !['daily-3', 'answers-10', 'accuracy-80'].includes(missionId)) throw invokeFailure()
+  const data = await invokeAuthenticated({ action: 'claim_weekly_mission', weekStart, missionId })
+  const stats = normalizeServerStats(data.progress)
+  if (typeof data.alreadyClaimed !== 'boolean' || !Number.isSafeInteger(data.rewardXp) || data.rewardXp < 0 || data.rewardXp > 500 || !stats) throw invokeFailure()
+  cloudStats.value = stats
+  return { alreadyClaimed: data.alreadyClaimed, rewardXp: data.rewardXp, progress: stats }
+}
+
+export async function fetchCloudXpHistory(limit = 50) {
+  if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100) throw invokeFailure()
+  const data = await invokeAuthenticated({ action: 'get_xp_history', limit })
+  if (!Array.isArray(data.transactions) || data.transactions.length > limit) throw invokeFailure()
+  const transactions = data.transactions.map((transaction) => {
+    if (!transaction || !SAFE_ID.test(transaction.id) || !['answer', 'weekly-mission'].includes(transaction.source)
+      || typeof transaction.title !== 'string' || !transaction.title.trim() || transaction.title.length > 120
+      || !Number.isSafeInteger(transaction.amount) || transaction.amount < 1 || transaction.amount > 500
+      || typeof transaction.createdAt !== 'string' || !Number.isFinite(Date.parse(transaction.createdAt))) throw invokeFailure()
+    return { id: transaction.id, source: transaction.source, title: transaction.title, amount: transaction.amount, createdAt: transaction.createdAt }
+  })
+  if (new Set(transactions.map(({ id }) => id)).size !== transactions.length) throw invokeFailure()
+  return transactions
+}
+
+const SKILL_CATEGORIES = new Set(['fundamentals', 'web-api', 'scenarios'])
+
+export function normalizeSkillComparison(value) {
+  if (!value || typeof value !== 'object' || !Array.isArray(value.categories) || value.categories.length !== 3) return null
+  const seen = new Set()
+  const categories = []
+  for (const item of value.categories) {
+    if (!item || !SKILL_CATEGORIES.has(item.id) || seen.has(item.id)
+      || !Number.isSafeInteger(item.personalAttempts) || item.personalAttempts < 0 || item.personalAttempts > MAX_COUNTER
+      || !Number.isSafeInteger(item.communityParticipants) || item.communityParticipants < 0 || item.communityParticipants > MAX_COUNTER
+      || (item.personalAccuracy !== null && (!Number.isSafeInteger(item.personalAccuracy) || item.personalAccuracy < 0 || item.personalAccuracy > 100))
+      || (item.communityAverage !== null && (!Number.isSafeInteger(item.communityAverage) || item.communityAverage < 0 || item.communityAverage > 100))
+      || (item.personalAttempts === 0) !== (item.personalAccuracy === null)
+      || (item.communityParticipants < 5 && item.communityAverage !== null)
+      || (item.communityParticipants >= 5 && item.communityAverage === null)) return null
+    seen.add(item.id)
+    categories.push({ ...item })
+  }
+  if (seen.size !== SKILL_CATEGORIES.size) return null
+  return { categories }
+}
+
+export async function fetchSkillComparison() {
+  const data = await invokeAuthenticated({ action: 'get_skill_comparison' })
+  const comparison = normalizeSkillComparison(data)
+  if (!comparison) throw invokeFailure()
+  return comparison
+}
+
+const ARENA_CHALLENGES = new Set(['scenario-investigation', 'fundamentals', 'web-api'])
+
+function normalizeArenaLeaderboard(value, expectedChallengeId) {
+  if (!value || typeof value !== 'object' || !ARENA_CHALLENGES.has(value.challengeId)
+    || (expectedChallengeId && value.challengeId !== expectedChallengeId) || !validDate(value.seasonStart)
+    || !Array.isArray(value.entries) || value.entries.length > 50
+    || !Number.isSafeInteger(value.totalParticipants) || value.totalParticipants < 0 || value.totalParticipants > MAX_COUNTER
+    || (value.currentUserRank !== null && (!Number.isSafeInteger(value.currentUserRank) || value.currentUserRank < 1 || value.currentUserRank > value.totalParticipants))) return null
+  const entries = []
+  let previousRank = 0
+  for (const entry of value.entries) {
+    if (!entry || !Number.isSafeInteger(entry.rank) || entry.rank <= previousRank || entry.rank > value.totalParticipants
+      || typeof entry.displayName !== 'string' || !LEADERBOARD_NAME.test(entry.displayName)
+      || !Number.isSafeInteger(entry.bestScore) || entry.bestScore < 0 || entry.bestScore > 100
+      || !Number.isSafeInteger(entry.matches) || entry.matches < 1 || entry.matches > MAX_COUNTER
+      || (entry.avatarUrl !== undefined && entry.avatarUrl !== null && (typeof entry.avatarUrl !== 'string' || entry.avatarUrl.length > 2_048))) return null
+    previousRank = entry.rank
+    let avatarUrl = null
+    if (typeof entry.avatarUrl === 'string') {
+      try {
+        const parsed = new URL(entry.avatarUrl)
+        if (parsed.protocol === 'https:') avatarUrl = parsed.href
+      } catch {
+        avatarUrl = null
+      }
+    }
+    entries.push({ rank: entry.rank, displayName: entry.displayName, avatarUrl, bestScore: entry.bestScore, matches: entry.matches })
+  }
+  if (entries.length > value.totalParticipants) return null
+  return { challengeId: value.challengeId, seasonStart: value.seasonStart, entries, currentUserRank: value.currentUserRank, totalParticipants: value.totalParticipants }
+}
+
+export async function fetchArenaLeaderboard(challengeId = 'scenario-investigation') {
+  if (!ARENA_CHALLENGES.has(challengeId)) throw invokeFailure()
+  const data = await invokeAuthenticated({ action: 'get_arena_leaderboard', challengeId })
+  const leaderboard = normalizeArenaLeaderboard(data, challengeId)
+  if (!leaderboard) throw invokeFailure()
+  return leaderboard
+}
+
+export async function submitCloudArenaResult({ sessionId, attemptIds, challengeId = 'scenario-investigation' }) {
+  if (!UUID.test(sessionId) || !Array.isArray(attemptIds) || attemptIds.length !== 10
+    || !attemptIds.every((id) => UUID.test(id)) || new Set(attemptIds).size !== 10 || !ARENA_CHALLENGES.has(challengeId)) throw invokeFailure()
+  const data = await invokeAuthenticated({ action: 'submit_arena_result', sessionId, attemptIds, challengeId })
+  const leaderboard = normalizeArenaLeaderboard(data.leaderboard, challengeId)
+  if (typeof data.accepted !== 'boolean' || !Number.isSafeInteger(data.score) || data.score < 0 || data.score > 100
+    || !Number.isSafeInteger(data.bestScore) || data.bestScore < data.score || data.bestScore > 100 || !leaderboard) throw invokeFailure()
+  return { accepted: data.accepted, score: data.score, bestScore: data.bestScore, leaderboard }
+}
+
 export function isServerScoringRequired() {
   return isSupabaseConfigured && ['connecting', 'error'].includes(cloudStatus.value)
 }

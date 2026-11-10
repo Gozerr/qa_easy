@@ -140,6 +140,12 @@ async function reset() {
       <div class="profile-level-progress"><div><strong>Уровень {{ level }}</strong><span>{{ 100 - levelProgress }} XP до следующего</span></div><div class="progress-track" role="progressbar" :aria-valuenow="levelProgress" aria-valuemin="0" aria-valuemax="100" aria-label="Прогресс до следующего уровня"><span :style="{ width: `${levelProgress}%` }" /></div></div>
     </section>
 
+    <RouterLink class="profile-xp-history" to="/xp-history">
+      <span><Sparkles :size="18" aria-hidden="true" /></span>
+      <span><strong>История XP и наград</strong><small>Посмотреть, за что начислялся опыт</small></span>
+      <ChevronRight :size="18" aria-hidden="true" />
+    </RouterLink>
+
     <section class="profile-section">
       <div class="section-heading">
         <div><p class="eyebrow">{{ Math.min(5, earnedAchievements) }} ПОСЛЕДНИХ ИЗ {{ earnedAchievements }} ОТКРЫТО</p><h2>Достижения</h2></div>

@@ -3,9 +3,10 @@ import { createId, createSession, validateAnswer } from '../lib/quizEngine.js'
 import { createInitialProgress, loadProgress, resetProgress, saveProgress } from '../lib/progressStorage.js'
 import { utcDateKey } from '../lib/dailyTask.js'
 import { theoryTopics } from '../data/theory.js'
-import { cloudProfile, cloudStats, cloudStatus, connectTelegram, createCloudQuizSession, getAuthenticatedTelegramInitData, isServerScoringRequired, resetCloudProgress, serverScoringIsActive, submitCloudAttempt } from '../lib/cloudApi.js'
+import { claimCloudWeeklyMission, cloudProfile, cloudStats, cloudStatus, connectTelegram, createCloudQuizSession, fetchArenaLeaderboard as fetchCloudArenaLeaderboard, fetchCloudXpHistory, fetchSkillComparison as fetchCloudSkillComparison, fetchWeeklyMissions, getAuthenticatedTelegramInitData, isServerScoringRequired, resetCloudProgress, serverScoringIsActive, submitCloudArenaResult, submitCloudAttempt } from '../lib/cloudApi.js'
 
 const SAFE_LESSON_ID = /^[a-z0-9][a-z0-9-]{0,79}$/
+const SAFE_ACTIVITY_ID = /^[a-z0-9][a-z0-9-]{0,79}$/
 
 const loaded = loadProgress()
 const progress = reactive(loaded.progress)
@@ -45,6 +46,7 @@ const achievements = computed(() => {
   const finishedModules = theoryTopics.filter(({ lessons }) => lessons.every(({ id }) => completedLessons.has(id))).length
   const designLessons = theoryTopics.find(({ id }) => id === 'test-design')?.lessons ?? []
   const accuracyReady = progress.answeredCount >= 10
+  const completedActivities = Object.values(progress.practiceResults).filter(({ bestScore }) => bestScore >= 75)
 
   return [
     achievement('first-answer', 'Первый шаг', 'Ответить на первый вопрос', 'sparkles', 'Практика', progress.answeredCount, 1),
@@ -58,6 +60,11 @@ const achievements = computed(() => {
     achievement('ninety-accuracy', 'Чистое попадание', 'Точность не ниже 90% после 10 ответов', 'award', 'Точность', accuracyReady && accuracy.value >= 90 ? 1 : 0, 1, 'Редкое'),
     achievement('ten-unique-questions', 'Широкий взгляд', 'Решить 10 разных вопросов', 'layers', 'Практика', progress.completedQuestionIds.length, 10, 'Необычное'),
     achievement('twenty-five-unique-questions', 'Исследователь', 'Решить 25 разных вопросов', 'search', 'Практика', progress.completedQuestionIds.length, 25, 'Редкое'),
+    achievement('first-practice', 'Практика началась', 'Завершить интерактивное упражнение с зачётным результатом', 'target', 'Практика', completedActivities.length, 1),
+    achievement('first-detective', 'Первое расследование', 'Найти причину и собрать доказательства в QA Detective', 'search', 'Практика', Object.entries(progress.practiceResults).filter(([id, result]) => id.startsWith('detective-') && result.bestScore >= 85).length, 1, 'Необычное'),
+    achievement('first-test-case', 'Проектировщик проверок', 'Собрать полный набор тест-кейсов', 'layers', 'Практика', progress.practiceResults['case-constructor-registration']?.bestScore === 100 ? 1 : 0, 1, 'Необычное'),
+    achievement('first-bug-report', 'Баг описан', 'Составить полный воспроизводимый баг-репорт', 'message', progress.practiceResults['bug-report-double-charge']?.bestScore === 100 ? 1 : 0, 1, 'Необычное'),
+    achievement('first-arena', 'Первый выход на арену', 'Завершить сезонное испытание с результатом от 70%', 'trophy', 'Соревнования', progress.practiceResults['arena-scenarios']?.bestScore >= 70 ? 1 : 0, 1, 'Необычное'),
     achievement('first-lesson', 'Открыл теорию', 'Отметить первый урок изученным', 'book', 'Обучение', completedLessons.size, 1),
     achievement('five-lessons', 'Учусь системно', 'Отметить пять уроков изученными', 'book', 'Обучение', completedLessons.size, 5),
     achievement('ten-lessons', 'Ученик QA', 'Изучить 10 уроков', 'book', 'Обучение', completedLessons.size, 10, 'Необычное'),
@@ -91,6 +98,55 @@ function markLessonComplete(lessonId) {
   if (typeof lessonId !== 'string' || !SAFE_LESSON_ID.test(lessonId)) return false
   if (!progress.completedLessonIds.includes(lessonId)) progress.completedLessonIds.push(lessonId)
   return true
+}
+
+function recordLessonPractice(lessonId, response) {
+  if (typeof lessonId !== 'string' || !SAFE_LESSON_ID.test(lessonId) || !response || typeof response !== 'object') return false
+  const scenario = typeof response.scenario === 'string' ? response.scenario.trim() : ''
+  const steps = typeof response.steps === 'string' ? response.steps.trim() : ''
+  const expected = typeof response.expected === 'string' ? response.expected.trim() : ''
+  if (!scenario || !steps || !expected || [scenario, steps, expected].some((value) => value.length > 1_500)) return false
+  progress.lessonPractices[lessonId] = { scenario, steps, expected, completedAt: new Date().toISOString() }
+  markLessonComplete(lessonId)
+  return true
+}
+
+function recordPracticeResult(activityId, score) {
+  if (typeof activityId !== 'string' || !SAFE_ACTIVITY_ID.test(activityId) || !Number.isInteger(score) || score < 0 || score > 100) return false
+  const current = progress.practiceResults[activityId]
+  if (!current || score > current.bestScore) {
+    progress.practiceResults[activityId] = { bestScore: score, completedAt: new Date().toISOString() }
+  }
+  return true
+}
+
+function recordLocalXpTransaction({ id, title, amount }) {
+  if (!SAFE_ACTIVITY_ID.test(id) || typeof title !== 'string' || !title.trim()
+    || !Number.isSafeInteger(amount) || amount < 1 || amount > 500) return false
+  if (progress.xpTransactions.some((transaction) => transaction.id === id)) return true
+  progress.xpTransactions.push({ id, source: 'answer', title: title.trim().slice(0, 120), amount, createdAt: new Date().toISOString() })
+  if (progress.xpTransactions.length > 500) progress.xpTransactions.splice(0, progress.xpTransactions.length - 500)
+  return true
+}
+
+async function getXpHistory(limit = 50) {
+  if (serverScoringIsActive()) return fetchCloudXpHistory(limit)
+  return progress.xpTransactions.slice(-limit).reverse()
+}
+
+async function getSkillComparison() {
+  if (!serverScoringIsActive()) return null
+  return fetchCloudSkillComparison()
+}
+
+async function getArenaLeaderboard(challengeId = 'scenario-investigation') {
+  if (!serverScoringIsActive()) return null
+  return fetchCloudArenaLeaderboard(challengeId)
+}
+
+async function submitArenaResult(sessionId, attemptIds, challengeId = 'scenario-investigation') {
+  if (!serverScoringIsActive()) throw new Error('Официальный результат требует подтверждённой сессии Telegram.')
+  return submitCloudArenaResult({ sessionId, attemptIds, challengeId })
 }
 
 function applyServerStats(stats) {
@@ -133,10 +189,12 @@ async function beginSession(mode, pool, size = 10, dailyDate = null) {
   const session = createSession(pool, size)
 
   if (serverScoringIsActive()) {
-    const request = mode === 'practice'
+    const request = mode === 'practice' || mode === 'arena'
       ? { mode: 'practice', size }
       : mode.startsWith('interview-')
         ? { mode, size }
+        : mode.startsWith('marathon-')
+          ? { mode, size }
         : mode.startsWith('theory-')
           ? { mode: 'theory', size: 1, questionId: pool[0]?.id }
           : mode.startsWith('daily-')
@@ -196,6 +254,7 @@ async function submitSessionAnswer(mode, question, optionId, dailyDate = null) {
   } else {
     if (isServerScoringRequired()) return { pending: true, error: 'Нет связи с сервером подтверждения. Ответ не засчитан. Повторите попытку, когда соединение восстановится.' }
     correct = validateAnswer(question, optionId)
+    recordLocalXpTransaction({ id: attempt.attemptId, title: question.question, amount: correct ? 10 : 3 })
   }
 
   const answer = { questionId: question.id, selectedOptionId: optionId, correct, correctOptionId, explanation, attemptId: attempt.attemptId }
@@ -259,6 +318,18 @@ function completeDaily(date = utcDateKey()) {
   if (!progress.dailyCompletions.includes(date)) progress.dailyCompletions.push(date)
 }
 
+async function getWeeklyMissions(weekStart) {
+  if (!serverScoringIsActive()) return null
+  return fetchWeeklyMissions(weekStart)
+}
+
+async function claimWeeklyMission(missionId, weekStart) {
+  if (!serverScoringIsActive()) throw new Error('Награду можно получить в проверенной сессии Telegram.')
+  const result = await claimCloudWeeklyMission({ missionId, weekStart })
+  applyServerStats(result.progress)
+  return result
+}
+
 function setTheme(theme) {
   if (['system', 'light', 'dark'].includes(theme)) progress.theme = theme
 }
@@ -301,10 +372,18 @@ export function useProgress() {
     submitSessionAnswer,
     retryPendingAttempt,
     advanceSession,
+    getWeeklyMissions,
+    claimWeeklyMission,
+    getXpHistory,
+    getSkillComparison,
+    getArenaLeaderboard,
+    submitArenaResult,
     authenticateTelegram,
     syncPendingAttempts,
     setTheme,
     markLessonComplete,
+    recordLessonPractice,
+    recordPracticeResult,
     clearProgress,
   }
 }

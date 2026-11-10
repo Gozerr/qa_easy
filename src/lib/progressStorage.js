@@ -1,7 +1,7 @@
 import { createId } from './quizEngine.js'
 
 export const STORAGE_KEY = 'qa-na-paltsakh:progress'
-export const STORAGE_VERSION = 4
+export const STORAGE_VERSION = 7
 
 const MAX_STORAGE_CHARS = 256_000
 const MAX_COUNT = 1_000_000_000
@@ -10,6 +10,7 @@ const MAX_DAILY_COMPLETIONS = 10_000
 const MAX_ACTIVE_SESSIONS = 50
 const MAX_SESSION_QUESTIONS = 100
 const MAX_PENDING_ATTEMPTS = 100
+const MAX_XP_TRANSACTIONS = 500
 const SAFE_ID = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}$/
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
@@ -37,6 +38,9 @@ export function createInitialProgress() {
     pendingCloudAttempts: [],
     completedLessonIds: [],
     achievementDates: {},
+    practiceResults: {},
+    lessonPractices: {},
+    xpTransactions: [],
     theme: 'system',
   }
 }
@@ -50,7 +54,7 @@ function browserStorage() {
 }
 
 function normalizeProgress(value) {
-  if (!value || ![1, 2, 3, STORAGE_VERSION].includes(value.version)) return null
+  if (!value || ![1, 2, 3, 4, 5, 6, STORAGE_VERSION].includes(value.version)) return null
   const migrating = value.version < STORAGE_VERSION
   if (!Number.isSafeInteger(value.xp) || !Number.isSafeInteger(value.answeredCount) || !Number.isSafeInteger(value.correctCount)) return null
   if (value.xp < 0 || value.answeredCount < 0 || value.correctCount < 0 || value.correctCount > value.answeredCount) return null
@@ -63,6 +67,11 @@ function normalizeProgress(value) {
   if (value.version === STORAGE_VERSION && !Array.isArray(value.completedLessonIds)) return null
   if (value.version === STORAGE_VERSION && (!value.achievementDates || typeof value.achievementDates !== 'object' || Array.isArray(value.achievementDates))) return null
   if (value.achievementDates && (typeof value.achievementDates !== 'object' || Array.isArray(value.achievementDates) || Object.keys(value.achievementDates).length > 100)) return null
+  if (value.version === STORAGE_VERSION && (!value.practiceResults || typeof value.practiceResults !== 'object' || Array.isArray(value.practiceResults))) return null
+  if (value.practiceResults && (typeof value.practiceResults !== 'object' || Array.isArray(value.practiceResults) || Object.keys(value.practiceResults).length > 1_000)) return null
+  if (value.version === STORAGE_VERSION && (!value.lessonPractices || typeof value.lessonPractices !== 'object' || Array.isArray(value.lessonPractices))) return null
+  if (value.lessonPractices && (typeof value.lessonPractices !== 'object' || Array.isArray(value.lessonPractices) || Object.keys(value.lessonPractices).length > 1_000)) return null
+  if (value.version === STORAGE_VERSION && (!Array.isArray(value.xpTransactions) || value.xpTransactions.length > MAX_XP_TRANSACTIONS)) return null
 
   const activeSessions = Object.fromEntries(Object.entries(value.activeSessions).flatMap(([mode, session]) => {
     if (!SAFE_ID.test(mode)) return []
@@ -140,6 +149,27 @@ function normalizeProgress(value) {
     pendingCloudAttempts,
     completedLessonIds: [...new Set((Array.isArray(value.completedLessonIds) ? value.completedLessonIds : []).filter((id) => typeof id === 'string' && SAFE_ID.test(id)))],
     achievementDates: Object.fromEntries(Object.entries(value.achievementDates ?? {}).filter(([id, date]) => SAFE_ID.test(id) && isIsoTimestamp(date))),
+    practiceResults: Object.fromEntries(Object.entries(value.practiceResults ?? {}).flatMap(([id, result]) => {
+      if (!SAFE_ID.test(id) || !result || typeof result !== 'object') return []
+      if (!Number.isInteger(result.bestScore) || result.bestScore < 0 || result.bestScore > 100 || !isIsoTimestamp(result.completedAt)) return []
+      return [[id, { bestScore: result.bestScore, completedAt: result.completedAt }]]
+    })),
+    lessonPractices: Object.fromEntries(Object.entries(value.lessonPractices ?? {}).flatMap(([id, result]) => {
+      if (!SAFE_ID.test(id) || !result || typeof result !== 'object' || !isIsoTimestamp(result.completedAt)) return []
+      const scenario = typeof result.scenario === 'string' ? result.scenario.trim().slice(0, 1_500) : ''
+      const steps = typeof result.steps === 'string' ? result.steps.trim().slice(0, 1_500) : ''
+      const expected = typeof result.expected === 'string' ? result.expected.trim().slice(0, 1_500) : ''
+      if (!scenario || !steps || !expected) return []
+      return [[id, { scenario, steps, expected, completedAt: result.completedAt }]]
+    })),
+    xpTransactions: (Array.isArray(value.xpTransactions) ? value.xpTransactions : []).flatMap((transaction) => {
+      if (!transaction || typeof transaction !== 'object' || !SAFE_ID.test(transaction.id)
+        || !['answer', 'weekly-mission'].includes(transaction.source)
+        || typeof transaction.title !== 'string' || !transaction.title.trim() || transaction.title.length > 120
+        || !Number.isSafeInteger(transaction.amount) || transaction.amount < 1 || transaction.amount > 500
+        || !isIsoTimestamp(transaction.createdAt)) return []
+      return [{ id: transaction.id, source: transaction.source, title: transaction.title.trim(), amount: transaction.amount, createdAt: transaction.createdAt }]
+    }).slice(-MAX_XP_TRANSACTIONS),
     theme: ['system', 'light', 'dark'].includes(value.theme) ? value.theme : 'system',
   }
 }
