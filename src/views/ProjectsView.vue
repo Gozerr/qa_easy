@@ -3,19 +3,27 @@ import { computed, ref, watch } from 'vue'
 import { ArrowLeft, ArrowRight, Check, CircleCheck, ClipboardCheck, LockKeyhole, RotateCcw, ShieldCheck, Workflow } from '@lucide/vue'
 import PageHeading from '../components/PageHeading.vue'
 import { useProgress } from '../composables/useProgress.js'
-import { qaProjects, scoreProject } from '../data/qaProjects.js'
+import { evaluateProjectArtifact, qaProjects, scoreProject } from '../data/qaProjects.js'
 
-const { progress, recordProjectAnswer } = useProgress()
+const { progress, recordProjectAnswer, recordProjectArtifact } = useProgress()
 const selectedId = ref(qaProjects[0].id)
 const taskIndex = ref(0)
+const artifactText = ref(progress.projectProgress[qaProjects[0].id]?.artifact ?? '')
+const artifactEvaluated = ref(false)
 const selectedProject = computed(() => qaProjects.find(({ id }) => id === selectedId.value) ?? qaProjects[0])
 const saved = computed(() => progress.projectProgress[selectedProject.value.id] ?? { answers: {}, bestScore: 0, completedAt: null })
 const task = computed(() => selectedProject.value.tasks[taskIndex.value])
 const result = computed(() => scoreProject(selectedProject.value, saved.value.answers))
 const answeredCount = computed(() => Object.keys(saved.value.answers).length)
 const currentAnswer = computed(() => saved.value.answers[task.value?.id] ?? '')
+const artifactChecks = computed(() => evaluateProjectArtifact(selectedProject.value, artifactText.value))
+const artifactPassed = computed(() => artifactChecks.value.filter(({ passed }) => passed).length)
 
-watch(selectedId, () => { taskIndex.value = 0 })
+watch(selectedId, () => {
+  taskIndex.value = 0
+  artifactText.value = progress.projectProgress[selectedId.value]?.artifact ?? ''
+  artifactEvaluated.value = false
+})
 
 function choose(optionId) {
   recordProjectAnswer(selectedProject.value.id, task.value.id, optionId)
@@ -24,6 +32,15 @@ function choose(optionId) {
 function selectProject(id) {
   selectedId.value = id
   taskIndex.value = 0
+}
+
+function saveArtifactDraft() {
+  recordProjectArtifact(selectedProject.value.id, artifactText.value)
+}
+
+function reviewArtifact() {
+  saveArtifactDraft()
+  artifactEvaluated.value = true
 }
 </script>
 
@@ -70,6 +87,20 @@ function selectProject(id) {
       <section v-if="result.complete" class="project-result" :class="{ 'is-passed': result.score >= 75 }" aria-live="polite">
         <span class="project-result-icon"><CircleCheck v-if="result.score >= 75" :size="22" aria-hidden="true" /><RotateCcw v-else :size="20" aria-hidden="true" /></span>
         <div><strong>{{ result.score >= 75 ? 'Проект сдан' : 'Есть что улучшить' }} · {{ result.score }}%</strong><p>{{ result.correct }} из {{ result.total }} решений соответствуют критериям. {{ result.score >= 75 ? 'Загляни в объяснения и переходи к следующему кейсу.' : 'Пересмотри решения и попробуй ещё раз.' }}</p></div>
+      </section>
+      <section class="project-artifact" :aria-labelledby="`artifact-title-${selectedProject.id}`">
+        <div class="project-artifact-heading"><span class="eyebrow">РАБОЧИЙ АРТЕФАКТ</span><span class="project-artifact-count">{{ artifactPassed }} / {{ artifactChecks.length }} критериев</span></div>
+        <h3 :id="`artifact-title-${selectedProject.id}`">{{ selectedProject.artifact.title }}</h3>
+        <p>{{ selectedProject.artifact.prompt }}</p>
+        <label class="project-artifact-label" :for="`artifact-editor-${selectedProject.id}`">Черновик</label>
+        <textarea :id="`artifact-editor-${selectedProject.id}`" v-model="artifactText" class="project-artifact-editor" rows="8" maxlength="5000" :placeholder="selectedProject.artifact.placeholder" @input="saveArtifactDraft" />
+        <div v-if="artifactEvaluated" class="project-artifact-rubric" role="status">
+          <p v-for="check in artifactChecks" :key="check.id" :class="{ 'is-passed': check.passed }"><Check :size="14" aria-hidden="true" /> {{ check.label }}</p>
+        </div>
+        <div class="project-artifact-footer">
+          <button class="button button-quiet" type="button" :disabled="!artifactText.trim()" @click="reviewArtifact">Проверить артефакт</button>
+          <small>Черновик автоматически сохраняется на этом устройстве.</small>
+        </div>
       </section>
       <p class="project-local-note">Это учебная симуляция с фиксированными критериями, а не проверка production-системы. Официальный XP за проекты не начисляется.</p>
     </section>

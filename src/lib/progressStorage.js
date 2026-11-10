@@ -3,7 +3,7 @@ import { qaProjects } from '../data/qaProjects.js'
 import { validateDailyChallenge } from './dailyChallenge.js'
 
 export const STORAGE_KEY = 'qa-na-paltsakh:progress'
-export const STORAGE_VERSION = 10
+export const STORAGE_VERSION = 11
 
 const MAX_STORAGE_CHARS = 256_000
 const MAX_COUNT = 1_000_000_000
@@ -59,7 +59,7 @@ function browserStorage() {
 }
 
 function normalizeProgress(value) {
-  if (!value || ![1, 2, 3, 4, 5, 6, 7, 8, 9, STORAGE_VERSION].includes(value.version)) return null
+  if (!value || ![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, STORAGE_VERSION].includes(value.version)) return null
   const migrating = value.version < STORAGE_VERSION
   if (!Number.isSafeInteger(value.xp) || !Number.isSafeInteger(value.answeredCount) || !Number.isSafeInteger(value.correctCount)) return null
   if (value.xp < 0 || value.answeredCount < 0 || value.correctCount < 0 || value.correctCount > value.answeredCount) return null
@@ -183,6 +183,7 @@ function normalizeProgress(value) {
         answers,
         bestScore: Number.isInteger(entry.bestScore) ? Math.max(0, Math.min(100, entry.bestScore)) : 0,
         completedAt: validDate ? entry.completedAt : null,
+        artifact: typeof entry.artifact === 'string' ? entry.artifact.slice(0, 5_000) : '',
       }]]
     })),
     dailyChallenges: Object.fromEntries(Object.entries(value.dailyChallenges ?? {}).flatMap(([date, record]) => {

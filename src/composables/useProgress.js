@@ -3,7 +3,7 @@ import { createId, createSession, validateAnswer } from '../lib/quizEngine.js'
 import { createInitialProgress, loadProgress, resetProgress, saveProgress } from '../lib/progressStorage.js'
 import { utcDateKey } from '../lib/dailyTask.js'
 import { theoryTopics } from '../data/theory.js'
-import { qaProjects, scoreProject } from '../data/qaProjects.js'
+import { evaluateProjectArtifact, qaProjects, scoreProject } from '../data/qaProjects.js'
 import { validateDailyChallenge } from '../lib/dailyChallenge.js'
 import { claimCloudWeeklyMission, cloudProfile, cloudStats, cloudStatus, connectTelegram, createCloudQuizSession, fetchArenaLeaderboard as fetchCloudArenaLeaderboard, fetchCloudXpHistory, fetchSkillComparison as fetchCloudSkillComparison, fetchWeeklyMissions, getAuthenticatedTelegramInitData, isServerScoringRequired, resetCloudProgress, saveCloudLessonProgress, serverScoringIsActive, submitCloudArenaResult, submitCloudAttempt } from '../lib/cloudApi.js'
 
@@ -156,6 +156,14 @@ function recordProjectAnswer(projectId, taskId, optionId) {
     entry.completedAt = new Date().toISOString()
   }
   return { ...result, bestScore: entry.bestScore, completedAt: entry.completedAt }
+}
+
+function recordProjectArtifact(projectId, artifact) {
+  const project = qaProjects.find(({ id }) => id === projectId)
+  if (!project || typeof artifact !== 'string' || artifact.length > 5_000) return null
+  const entry = progress.projectProgress[projectId] ??= { answers: {}, bestScore: 0, completedAt: null, artifact: '' }
+  entry.artifact = artifact
+  return evaluateProjectArtifact(project, artifact)
 }
 
 function recordLocalXpTransaction({ id, title, amount }) {
@@ -436,6 +444,7 @@ export function useProgress() {
     recordLessonPractice,
     recordPracticeResult,
     recordProjectAnswer,
+    recordProjectArtifact,
     recordDailyChallenge,
     clearProgress,
   }

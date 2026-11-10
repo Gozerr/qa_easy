@@ -126,7 +126,7 @@ describe('quiz engine', () => {
     }))
     const migrated = loadProgress(storage)
     expect(migrated.recovered).toBe(false)
-    expect(migrated.progress.version).toBe(10)
+    expect(migrated.progress.version).toBe(11)
     expect(migrated.progress.activeSessions.practice.sessionId).toBeTruthy()
     expect(loadProgress(storage).progress.activeSessions.practice.questionIds).toEqual(['qa-01'])
 
@@ -146,7 +146,7 @@ describe('quiz engine', () => {
 
     const migrated = loadProgress(storage)
     expect(migrated.recovered).toBe(false)
-    expect(migrated.progress.version).toBe(10)
+    expect(migrated.progress.version).toBe(11)
     expect(migrated.progress.xp).toBe(150)
     expect(migrated.progress.completedLessonIds).toEqual(['basics-qa', 'sql-model'])
     expect(migrated.progress.achievementDates).toEqual({})
@@ -183,7 +183,7 @@ describe('quiz engine', () => {
     }))
     const migrated = loadProgress(storage)
     expect(migrated.recovered).toBe(false)
-    expect(migrated.progress.version).toBe(10)
+    expect(migrated.progress.version).toBe(11)
     expect(migrated.progress.seasonalResults).toEqual({
       '2026-11': {
         'arena-scenarios': { bestScore: 80, completedAt: '2026-11-10T10:00:00.000Z' },
@@ -206,12 +206,28 @@ describe('quiz engine', () => {
     }))
     const migrated = loadProgress(storage)
     expect(migrated.recovered).toBe(false)
-    expect(migrated.progress.version).toBe(10)
+    expect(migrated.progress.version).toBe(11)
     expect(migrated.progress.projectProgress['idor-security']).toEqual({
       answers: { 'trust-boundary': 'server-owner', coverage: 'access-matrix', denial: 'deny-no-data', evidence: 'synthetic-proof' },
       bestScore: 100,
       completedAt: '2026-11-10T10:00:00.000Z',
+      artifact: '',
     })
+  })
+
+  it('preserves editable project artifacts when migrating schema v10', () => {
+    const artifact = 'Role | Operation | Expected\nOwner | GET | 200 own order\nOther user | PATCH | 403 with no data changes'
+    const storage = memoryStorage(JSON.stringify({
+      ...createInitialProgress(),
+      version: 10,
+      projectProgress: {
+        'idor-security': { answers: {}, bestScore: 75, completedAt: '2026-11-10T10:00:00.000Z', artifact },
+      },
+    }))
+    const migrated = loadProgress(storage)
+    expect(migrated.recovered).toBe(false)
+    expect(migrated.progress.version).toBe(11)
+    expect(migrated.progress.projectProgress['idor-security'].artifact).toBe(artifact)
   })
 
   it('round-trips validated local daily challenge deliverables', () => {

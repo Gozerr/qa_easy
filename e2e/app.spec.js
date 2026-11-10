@@ -231,6 +231,8 @@ test('сквозные проекты проверяют API security, инте�
         /Вернуть согласованный 403 или 404/,
         /Синтетические аккаунты A\/B/,
       ],
+      artifact: 'Role | Operation | Expected\nOwner | GET /orders/id | 200 own order\nOther user | GET /orders/id | 403 without order fields\nOther user | PATCH /orders/id | reject with no data changes\nAdmin | GET /orders/id | allowed by role',
+      criteria: 3,
     },
     {
       title: /Платёжный callback пришёл дважды/,
@@ -240,6 +242,8 @@ test('сквозные проекты проверяют API security, инте�
         /Повтор с тем же ключом безопасен/,
         /Корреляционный ID, event ID/,
       ],
+      artifact: 'Event ID | Action | Expected\nSame event ID and idempotency key | Deliver the same event twice after timeout | One transaction\nTimeout after commit | Retry with same key | Stable order state\nQueue retry | Verify database and provider state',
+      criteria: 4,
     },
     {
       title: /Нестабильный checkout в CI/,
@@ -249,6 +253,8 @@ test('сквозные проекты проверяют API security, инте�
         /изолированные тестовые данные через fixture/,
         /Ждать конкретного состояния интерфейса/,
       ],
+      artifact: 'Unit: discount boundaries; API integration: payment contract; E2E smoke.\nFixture creates a unique test ID and cleans up only its own data.\nUse a locator by role and accessible name.\nWait for paid state, save trace and logs, avoid sleep.',
+      criteria: 4,
     },
   ]
 
@@ -260,11 +266,16 @@ test('сквозные проекты проверяют API security, инте�
       if (index < project.answers.length - 1) await page.getByRole('button', { name: 'Дальше' }).click()
     }
     await expect(page.locator('.project-result')).toContainText('Проект сдан · 100%')
+    await page.getByRole('textbox', { name: 'Черновик' }).fill(project.artifact)
+    await page.getByRole('button', { name: 'Проверить артефакт' }).click()
+    await expect(page.locator('.project-artifact-rubric p.is-passed')).toHaveCount(project.criteria)
   }
 
   await page.reload()
   await expect(page.locator('.project-result')).toContainText('Проект сдан · 100%')
   await expect(page.locator('.project-picker-card.is-complete')).toHaveCount(3)
+  await page.getByRole('button', { name: /Нестабильный checkout в CI/ }).click()
+  await expect(page.getByRole('textbox', { name: 'Черновик' })).toHaveValue(/Unit: discount boundaries/)
   await expect.poll(() => page.evaluate(() => Object.keys(JSON.parse(localStorage.getItem('qa-na-paltsakh:progress')).projectProgress).length)).toBe(3)
 })
 
