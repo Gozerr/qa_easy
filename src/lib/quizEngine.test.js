@@ -31,10 +31,10 @@ function memoryStorage(initialValue = null) {
 }
 
 describe('quiz engine', () => {
-  it('ships 40 distinct, complete questions, including twenty real-world scenarios', () => {
-    expect(questions).toHaveLength(40)
-    expect(new Set(questions.map(({ id }) => id)).size).toBe(40)
-    expect(new Set(questions.map(({ question }) => question.trim().toLocaleLowerCase('ru'))).size).toBe(40)
+  it('ships 41 distinct, complete questions, including twenty real-world scenarios', () => {
+    expect(questions).toHaveLength(41)
+    expect(new Set(questions.map(({ id }) => id)).size).toBe(41)
+    expect(new Set(questions.map(({ question }) => question.trim().toLocaleLowerCase('ru'))).size).toBe(41)
     for (const { id, category, difficulty, question, options, correctOptionId, explanation } of questions) {
       expect(id).toBeTruthy()
       expect(categories.map(({ id: categoryId }) => categoryId)).toContain(category)
@@ -44,7 +44,7 @@ describe('quiz engine', () => {
       expect(new Set(options.map(({ id: optionId }) => optionId)).size).toBe(options.length)
       expect(options.map(({ id: optionId }) => optionId)).toContain(correctOptionId)
     }
-    expect(questions.filter(({ category }) => category === 'fundamentals')).toHaveLength(10)
+    expect(questions.filter(({ category }) => category === 'fundamentals')).toHaveLength(11)
     expect(questions.filter(({ category }) => category === 'web-api')).toHaveLength(10)
     expect(questions.filter(({ category }) => category === 'scenarios')).toHaveLength(20)
   })
@@ -61,6 +61,14 @@ describe('quiz engine', () => {
     expect(lessons).toHaveLength(50)
     expect(new Set(lessons.map(({ id }) => id)).size).toBe(50)
     expect(lessons.every(({ id, heading, example, pitfall }) => id && heading && example && pitfall)).toBe(true)
+  })
+
+  it('gives every one of ten five-lesson modules a unique, valid final knowledge check', () => {
+    expect(theoryTopics).toHaveLength(10)
+    expect(theoryTopics.every(({ lessons }) => lessons.length === 5)).toBe(true)
+    const checkQuestionIds = theoryTopics.map(({ checkQuestionId }) => checkQuestionId)
+    expect(new Set(checkQuestionIds).size).toBe(10)
+    expect(checkQuestionIds.every((id) => questions.some(({ id: questionId }) => questionId === id))).toBe(true)
   })
 
   it('shuffles with Fisher–Yates while preserving every item', () => {

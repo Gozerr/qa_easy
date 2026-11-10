@@ -399,7 +399,7 @@ test('собеседование переключает набор, а теор�
   await page.goto('interview')
   await expect(page.getByText('21 вопросов')).toBeVisible()
   await page.getByRole('button', { name: /Middle/ }).click()
-  await expect(page.getByText('19 вопросов')).toBeVisible()
+  await expect(page.getByText('20 вопросов')).toBeVisible()
   await page.getByRole('button', { name: 'Начать подготовку' }).click()
   await expect(page.locator('.question-heading h2')).toBeVisible()
 
@@ -428,6 +428,25 @@ test('практика каждого урока сохраняется и от�
   const restoredLesson = page.locator('.lesson-block').first()
   await expect(restoredLesson.locator('textarea').nth(0)).toHaveValue('Проверить повторную отправку платежного запроса')
   await expect(restoredLesson.getByRole('status')).toContainText('Практика сохранена')
+})
+
+test('модуль SQL завершает контрольный вопрос и сохраняет ответ после перезагрузки', async ({ page }) => {
+  await page.goto('theory')
+  await page.locator('.skill-node').nth(6).click()
+  const module = page.locator('#sql-databases')
+  const check = module.locator('.knowledge-check')
+  await expect(check).toBeVisible()
+  await check.getByRole('button', { name: 'Ответить на вопрос' }).click()
+  await expect(check.locator('.question-heading h2')).toContainText('Нужно посчитать заказы каждого пользователя')
+  await check.locator('.answer-option').first().click()
+  await check.getByRole('button', { name: 'Проверить ответ' }).click()
+  await expect(check.locator('.feedback-box')).toBeVisible()
+  await check.getByRole('button', { name: 'К результатам' }).click()
+  await expect(check.locator('.result-state h2')).toBeVisible()
+
+  await page.reload()
+  await page.locator('.skill-node').nth(6).click()
+  await expect(page.locator('#sql-databases .knowledge-check .result-state h2')).toBeVisible()
 })
 
 test('тема сохраняется после перезагрузки', async ({ page }) => {

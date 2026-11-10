@@ -441,6 +441,17 @@ export const questions = [
     ], correctOptionId: 'a',
     explanation: 'Разделите сохранение на сервере и синхронизацию интерфейса. Зафиксируйте ответ API и состояние списка до и после повторного чтения.',
   },
+  {
+    id: 'qa-41', category: 'fundamentals', difficulty: 'Средний', interviewLevel: 'middle',
+    question: 'Нужно посчитать заказы каждого пользователя и сохранить в результате тех, у кого заказов нет. Какой подход корректен?',
+    options: [
+      { id: 'a', text: 'LEFT JOIN от users к orders, GROUP BY по ID пользователя и COUNT по orders.id' },
+      { id: 'b', text: 'INNER JOIN и COUNT(*), так как он сохраняет пользователей без совпадений' },
+      { id: 'c', text: 'LEFT JOIN, затем WHERE orders.status = \'paid\', чтобы не потерять пользователей без заказов' },
+      { id: 'd', text: 'Сгруппировать только orders по статусу и считать результат числом пользователей' },
+    ], correctOptionId: 'a',
+    explanation: 'LEFT JOIN сохраняет пользователя без заказа. COUNT(orders.id) вернёт для такого пользователя 0; COUNT(*) посчитает и строку с NULL, а фильтр по orders в WHERE может убрать её.',
+  },
 ]
 
 export const categories = [
