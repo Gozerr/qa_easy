@@ -31,10 +31,10 @@ function memoryStorage(initialValue = null) {
 }
 
 describe('quiz engine', () => {
-  it('ships 30 distinct, complete questions with ten in each category', () => {
-    expect(questions).toHaveLength(30)
-    expect(new Set(questions.map(({ id }) => id)).size).toBe(30)
-    expect(new Set(questions.map(({ question }) => question.trim().toLocaleLowerCase('ru'))).size).toBe(30)
+  it('ships 40 distinct, complete questions, including twenty real-world scenarios', () => {
+    expect(questions).toHaveLength(40)
+    expect(new Set(questions.map(({ id }) => id)).size).toBe(40)
+    expect(new Set(questions.map(({ question }) => question.trim().toLocaleLowerCase('ru'))).size).toBe(40)
     for (const { id, category, difficulty, question, options, correctOptionId, explanation } of questions) {
       expect(id).toBeTruthy()
       expect(categories.map(({ id: categoryId }) => categoryId)).toContain(category)
@@ -44,7 +44,9 @@ describe('quiz engine', () => {
       expect(new Set(options.map(({ id: optionId }) => optionId)).size).toBe(options.length)
       expect(options.map(({ id: optionId }) => optionId)).toContain(correctOptionId)
     }
-    for (const { id } of categories) expect(questions.filter((question) => question.category === id)).toHaveLength(10)
+    expect(questions.filter(({ category }) => category === 'fundamentals')).toHaveLength(10)
+    expect(questions.filter(({ category }) => category === 'web-api')).toHaveLength(10)
+    expect(questions.filter(({ category }) => category === 'scenarios')).toHaveLength(20)
   })
 
   it('ships 30 distinct daily tasks linked to valid questions', () => {

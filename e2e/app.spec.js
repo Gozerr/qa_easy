@@ -387,9 +387,9 @@ test('практикум связывает кейсы, баг-репорты и
 
 test('собеседование переключает набор, а теория открывает фильтрованный материал', async ({ page }) => {
   await page.goto('interview')
-  await expect(page.getByText('18 вопросов')).toBeVisible()
+  await expect(page.getByText('21 вопросов')).toBeVisible()
   await page.getByRole('button', { name: /Middle/ }).click()
-  await expect(page.getByText('12 вопросов')).toBeVisible()
+  await expect(page.getByText('19 вопросов')).toBeVisible()
   await page.getByRole('button', { name: 'Начать подготовку' }).click()
   await expect(page.locator('.question-heading h2')).toBeVisible()
 
