@@ -227,6 +227,32 @@ test('практикум связывает кейсы, баг-репорты и
   await page.getByRole('button', { name: 'Оценить покрытие' }).click()
   await expect(page.locator('.activity-feedback strong')).toContainText('покрывает четыре')
 
+  const additionalCaseSets = [
+    ['password-reset', [
+      ['positive', 'Запросить ссылку для зарегистрированного адреса', 'Показано нейтральное подтверждение, ссылка отправлена один раз'],
+      ['negative', 'Передать неизвестный email', 'Ответ не раскрывает наличие аккаунта'],
+      ['boundary', 'Открыть токен на границе срока действия', 'Срок проверяется по серверному времени и заданному правилу'],
+      ['validation', 'Повторно использовать уже погашенный токен', 'Пароль не меняется, клиент получает понятную ошибку'],
+    ]],
+    ['cart-checkout', [
+      ['positive', 'Увеличить количество доступного товара на единицу', 'Итог и количество в заказе пересчитаны согласованно'],
+      ['negative', 'Отправить отрицательное количество товара', 'Сервер отклоняет запрос и не меняет корзину'],
+      ['boundary', 'Добавить товар в максимально допустимом количестве', 'Допустимая верхняя граница принимается без переполнения суммы'],
+      ['validation', 'Применить истёкший промокод', 'Скидка не применяется, отображается причина отказа'],
+    ]],
+  ]
+  for (const [scenario, scenarios] of additionalCaseSets) {
+    await page.getByLabel('Выбери сценарий конструктора тест-кейсов').selectOption(scenario)
+    for (const [category, condition, expected] of scenarios) {
+      await page.getByLabel('Тип проверки').selectOption(category)
+      await page.getByLabel('Условие или данные').fill(condition)
+      await page.getByLabel('Ожидаемый результат').fill(expected)
+      await page.getByRole('button', { name: 'Добавить кейс' }).click()
+    }
+    await page.getByRole('button', { name: 'Оценить покрытие' }).click()
+    await expect(page.locator('.activity-feedback strong')).toContainText('покрывает четыре')
+  }
+
   await page.getByRole('button', { name: 'Баг-репорт' }).click()
   await page.getByLabel('Заголовок', { exact: true }).fill('Payments: повтор после timeout списывает оплату дважды')
   await page.getByLabel('Окружение').fill('Android 15, Telegram 12, QA build 42')
@@ -238,6 +264,24 @@ test('практикум связывает кейсы, баг-репорты и
   await page.getByLabel('Priority').selectOption('Немедленно')
   await page.getByRole('button', { name: 'Проверить баг-репорт' }).click()
   await expect(page.locator('.activity-feedback strong')).toContainText('Отчёт можно передавать')
+
+  for (const [issueId, title, actual] of [
+    ['idor-order', 'Orders API: изменение ID раскрывает адрес другого клиента', 'API вернул адрес и имя владельца чужого заказа'],
+    ['duplicate-notice', 'Уведомления: повтор события отправляет одно письмо дважды', 'Получатель увидел два письма об одной доставке'],
+  ]) {
+    await page.getByLabel('Выбери дефект для баг-репорта').selectOption(issueId)
+    await expect(page.locator('.activity-feedback')).toHaveCount(0)
+    await page.getByLabel('Заголовок', { exact: true }).fill(title)
+    await page.getByLabel('Окружение').fill('Android 15, Telegram 12, QA build 42')
+    await page.getByLabel('Предусловия').fill('Созданы синтетические аккаунты и тестовые данные для воспроизведения')
+    await page.getByLabel('Шаги · каждый с новой строки').fill('Выполнить исходный запрос с тестовыми данными\nПовторить действие с другим объектом или event ID\nСверить ответ API и итоговое состояние')
+    await page.getByLabel('Фактический результат').fill(actual)
+    await page.getByLabel('Ожидаемый результат').fill('Защищённые данные не возвращаются, побочный эффект выполняется не более одного раза')
+    await page.getByLabel('Severity').selectOption('Высокая')
+    await page.getByLabel('Priority').selectOption('Высокий')
+    await page.getByRole('button', { name: 'Проверить баг-репорт' }).click()
+    await expect(page.locator('.activity-feedback strong')).toContainText('Отчёт можно передавать')
+  }
 
   await page.getByRole('button', { name: 'QA Detective' }).click()
   await page.getByLabel(/Логи платёжных попыток/).check()
@@ -251,6 +295,24 @@ test('практикум связывает кейсы, баг-репорты и
   await page.locator('#detective-steps').fill('Создать заказ и начать оплату\nДождаться timeout и повторить запрос\nСверить transaction ID у провайдера')
   await page.getByRole('button', { name: 'Завершить расследование' }).click()
   await expect(page.locator('.detective-stage h3')).toContainText('100%')
+
+  const detectiveRuns = [
+    { title: /Чужой адрес в карточке заказа/, probe: /Сравнить actor ID/, cause: /Сервер проверяет только вход/, tests: [/Сравнить владельца, другого пользователя/, /Проверить отсутствие полей заказа/] },
+    { title: /Уведомление отправляется повторно/, probe: /Сопоставить event ID/, cause: /не дедуплицирует повторно доставленное событие/, tests: [/Доставить один event ID повторно/, /Проверить ACK после отказа/] },
+  ]
+  for (const item of detectiveRuns) {
+    await page.getByRole('button', { name: item.title }).click()
+    await page.getByLabel(item.probe).check()
+    await page.getByRole('button', { name: 'Изучить данные' }).click()
+    await page.getByLabel(item.cause).check()
+    await page.getByRole('button', { name: 'Сформировать план проверок' }).click()
+    for (const testCase of item.tests) await page.getByLabel(testCase).check()
+    await page.getByRole('button', { name: 'Составить отчёт' }).click()
+    await page.locator('#detective-title').fill('Исследование дефекта и проверяемое последствие для тестовых данных')
+    await page.locator('#detective-steps').fill('Создать синтетические данные и подготовить исходное состояние\nВоспроизвести запрос или повтор события\nПроверить ответ и отсутствие лишнего изменения')
+    await page.getByRole('button', { name: 'Завершить расследование' }).click()
+    await expect(page.locator('.detective-stage h3')).toContainText('100%')
+  }
 })
 
 test('собеседование переключает набор, а теория открывает фильтрованный материал', async ({ page }) => {

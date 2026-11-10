@@ -14,6 +14,13 @@ const report = reactive({
   severity: '',
   priority: '',
 })
+const issues = [
+  { id: 'double-charge', activityId: 'bug-report-double-charge', title: 'Двойное списание после таймаута', prompt: 'После сетевого таймаута пользователь повторил оплату, и с карты списали деньги дважды. Составь отчёт, по которому команда сможет воспроизвести дефект и понять его влияние.', placeholder: 'Платёж: повтор после таймаута создаёт второе списание' },
+  { id: 'idor-order', activityId: 'bug-report-order-access', title: 'Доступ к чужому заказу', prompt: 'Пользователь заменил ID заказа в API и увидел имя и адрес другого клиента. Зафиксируй нарушенную границу доступа и влияние на приватность.', placeholder: 'Orders API: изменение ID открывает чужой адрес доставки' },
+  { id: 'duplicate-notice', activityId: 'bug-report-duplicate-notification', title: 'Дублирующееся уведомление', prompt: 'После временной ошибки почтового сервиса клиент получил два одинаковых письма о доставке. Опиши повторную доставку события и ожидаемое поведение.', placeholder: 'Уведомления: повтор события отправляет письмо дважды' },
+]
+const selectedIssueId = ref(issues[0].id)
+const activeIssue = computed(() => issues.find(({ id }) => id === selectedIssueId.value) ?? issues[0])
 const evaluated = ref(false)
 const steps = computed(() => report.steps.split(/\r?\n/).map((step) => step.trim()).filter(Boolean))
 const checks = computed(() => [
@@ -27,22 +34,28 @@ const checks = computed(() => [
   { label: 'Выбран приоритет', passed: Boolean(report.priority) },
 ])
 const score = computed(() => Math.round(checks.value.filter(({ passed }) => passed).length / checks.value.length * 100))
-const saved = computed(() => progress.practiceResults['bug-report-double-charge']?.bestScore === 100)
+const saved = computed(() => progress.practiceResults[activeIssue.value.activityId]?.bestScore === 100)
+
+function changeIssue() {
+  for (const key of Object.keys(report)) report[key] = ''
+  evaluated.value = false
+}
 
 function evaluateReport() {
   evaluated.value = true
-  if (checks.value.every(({ passed }) => passed)) recordPracticeResult('bug-report-double-charge', 100)
+  if (checks.value.every(({ passed }) => passed)) recordPracticeResult(activeIssue.value.activityId, 100)
 }
 </script>
 
 <template>
   <section class="activity-card">
-    <p class="eyebrow">BUG REPORT CHALLENGE · JUNIOR</p>
-    <h2>Опиши двойное списание</h2>
-    <p class="activity-prompt">После сетевого таймаута пользователь повторил оплату, и с карты списали деньги дважды. Составь отчёт, по которому команда сможет воспроизвести дефект и понять его влияние.</p>
+    <p class="eyebrow">BUG REPORT CHALLENGE · {{ issues.length }} ДЕФЕКТА</p>
+    <label class="case-scenario-picker"><span>Выбери дефект</span><select v-model="selectedIssueId" aria-label="Выбери дефект для баг-репорта" @change="changeIssue"><option v-for="issue in issues" :key="issue.id" :value="issue.id">{{ issue.title }}</option></select></label>
+    <h2>{{ activeIssue.title }}</h2>
+    <p class="activity-prompt">{{ activeIssue.prompt }}</p>
 
     <div class="bug-report-form">
-      <label><span>Заголовок</span><input v-model="report.title" maxlength="160" placeholder="Компонент: условие — наблюдаемое последствие"></label>
+      <label><span>Заголовок</span><input v-model="report.title" maxlength="160" :placeholder="activeIssue.placeholder"></label>
       <label><span>Окружение</span><input v-model="report.environment" maxlength="160" placeholder="ОС, браузер, версия приложения"></label>
       <label><span>Предусловия</span><textarea v-model="report.preconditions" rows="2" maxlength="300" placeholder="Пользователь вошёл, заказ создан…"></textarea></label>
       <label><span>Шаги · каждый с новой строки</span><textarea v-model="report.steps" rows="4" maxlength="700" placeholder="1. Создать заказ…&#10;2. Начать оплату…&#10;3. Повторить запрос после таймаута…"></textarea></label>

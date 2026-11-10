@@ -1,9 +1,12 @@
 <script setup>
 import { computed, ref } from 'vue'
-import { ArrowRight, Check, FileSearch, Lightbulb } from '@lucide/vue'
+import { ArrowRight, Check, FileSearch, Lightbulb, RotateCcw } from '@lucide/vue'
 import { useProgress } from '../composables/useProgress.js'
+import { detectiveCases } from '../data/detectiveCases.js'
 
 const { progress, recordPracticeResult } = useProgress()
+const selectedCaseId = ref(detectiveCases[0].id)
+const activeCase = computed(() => detectiveCases.find(({ id }) => id === selectedCaseId.value) ?? detectiveCases[0])
 const phase = ref('probe')
 const probe = ref('')
 const cause = ref('')
@@ -11,43 +14,34 @@ const selectedTests = ref([])
 const reportTitle = ref('')
 const reportSteps = ref('')
 const result = ref(null)
-const probeWasUseful = computed(() => probe.value === 'payment-logs')
-const expectedTests = ['same-idempotency-key', 'duplicate-callback']
+const probeWasUseful = computed(() => activeCase.value.probes.find(({ id }) => id === probe.value)?.useful === true)
 const reportReady = computed(() => reportTitle.value.trim().length >= 12 && reportSteps.value.split(/\r?\n/).filter((step) => step.trim()).length >= 2)
-const savedScore = computed(() => progress.practiceResults['detective-double-charge']?.bestScore ?? null)
+const savedScore = computed(() => progress.practiceResults[activeCase.value.progressId]?.bestScore ?? null)
 
-const tests = [
-  { id: 'same-idempotency-key', title: 'Повторить оплату после таймаута с тем же idempotency key' },
-  { id: 'duplicate-callback', title: 'Повторно доставить callback платежа и проверить единственное списание' },
-  { id: 'clear-cache', title: 'Очистить cache и сравнить цвета кнопки оплаты' },
-  { id: 'change-browser', title: 'Повторить один запрос в другом браузере без сравнения transaction ID' },
-]
+function selectCase(id) {
+  selectedCaseId.value = id
+  restart()
+}
 
 function advanceProbe() {
-  if (!probe.value) return
-  phase.value = 'cause'
+  if (probe.value) phase.value = 'cause'
 }
 
 function advanceCause() {
-  if (!cause.value) return
-  phase.value = 'tests'
-}
-
-function showReport() {
-  phase.value = 'report'
+  if (cause.value) phase.value = 'tests'
 }
 
 function submitInvestigation() {
   if (!reportReady.value) return
   const probeScore = probeWasUseful.value ? 20 : 0
-  const causeScore = cause.value === 'missing-idempotency' ? 30 : 0
-  const correctSelected = selectedTests.value.filter((id) => expectedTests.includes(id)).length
-  const irrelevantSelected = selectedTests.value.filter((id) => !expectedTests.includes(id)).length
-  const testScore = Math.max(0, correctSelected - irrelevantSelected) / expectedTests.length * 30
+  const causeScore = cause.value === activeCase.value.correctCauseId ? 30 : 0
+  const correctSelected = selectedTests.value.filter((id) => activeCase.value.expectedTests.includes(id)).length
+  const irrelevantSelected = selectedTests.value.filter((id) => !activeCase.value.expectedTests.includes(id)).length
+  const testScore = Math.max(0, correctSelected - irrelevantSelected) / activeCase.value.expectedTests.length * 30
   const reportScore = 20
   const score = Math.round(probeScore + causeScore + testScore + reportScore)
   result.value = { score, probeScore, causeScore, testScore, reportScore }
-  if (score >= 75) recordPracticeResult('detective-double-charge', score)
+  recordPracticeResult(activeCase.value.progressId, score)
   phase.value = 'result'
 }
 
@@ -64,53 +58,54 @@ function restart() {
 
 <template>
   <section class="activity-card detective-card">
-    <p class="eyebrow">QA DETECTIVE · ДЕЛО № 01</p>
-    <h2>Двойное списание после таймаута</h2>
-    <p class="activity-prompt">Поддержка сообщает: «Клиент не увидел подтверждение оплаты, нажал повторить и получил два списания». Разберись в цепочке, выбери проверку, установи вероятную причину и собери баг-репорт.</p>
-    <div class="detective-case-meta"><span>Сложность · Junior+</span><span>4 этапа</span></div>
+    <p class="eyebrow">QA DETECTIVE · {{ detectiveCases.length }} ДЕЛА</p>
+    <div class="detective-case-picker" role="group" aria-label="Выбор дела QA Detective">
+      <button v-for="item in detectiveCases" :key="item.id" type="button" :class="{ 'is-active': item.id === activeCase.id }" :aria-pressed="item.id === activeCase.id" @click="selectCase(item.id)">
+        <span>ДЕЛО {{ String(detectiveCases.indexOf(item) + 1).padStart(2, '0') }} · {{ item.difficulty }}</span>
+        <strong>{{ item.title }}</strong>
+        <small v-if="progress.practiceResults[item.progressId]">Лучший результат {{ progress.practiceResults[item.progressId].bestScore }}%</small>
+      </button>
+    </div>
+    <h2>{{ activeCase.title }}</h2>
+    <p class="activity-prompt">{{ activeCase.prompt }}</p>
+    <div class="detective-case-meta"><span>Сложность · {{ activeCase.difficulty }}</span><span>4 этапа</span></div>
 
     <section v-if="phase === 'probe'" class="detective-stage">
       <div class="knowledge-label"><FileSearch :size="16" aria-hidden="true" /> ЭТАП 1 · ЧТО ИЗУЧИТЬ СНАЧАЛА?</div>
-      <label class="detective-option"><input v-model="probe" type="radio" value="payment-logs"><span>Логи платёжных попыток и transaction ID после timeout.</span></label>
-      <label class="detective-option"><input v-model="probe" type="radio" value="button-color"><span>Цвет и отступ кнопки подтверждения оплаты.</span></label>
-      <label class="detective-option"><input v-model="probe" type="radio" value="browser-cache"><span>Состояние cache браузера на устройстве клиента.</span></label>
+      <label v-for="option in activeCase.probes" :key="option.id" class="detective-option"><input v-model="probe" type="radio" :value="option.id"><span>{{ option.label }}</span></label>
       <button class="button button-primary" type="button" :disabled="!probe" @click="advanceProbe">Изучить данные <ArrowRight :size="15" aria-hidden="true" /></button>
-      <div v-if="probe && !probeWasUseful" class="detective-hint"><Lightbulb :size="15" aria-hidden="true" /> Начни с серверной цепочки оплаты: она покажет, сколько запросов дошло до провайдера.</div>
+      <div v-if="probe && !probeWasUseful" class="detective-hint"><Lightbulb :size="15" aria-hidden="true" /> Выбери источник, который помогает проверить цепочку действий и состояние объекта на сервере.</div>
     </section>
 
     <section v-else-if="phase === 'cause'" class="detective-stage">
       <div class="knowledge-label"><FileSearch :size="16" aria-hidden="true" /> ЭТАП 2 · СОПОСТАВЬ ФАКТЫ</div>
-      <div v-if="probeWasUseful" class="evidence-log"><code>10:14:03 POST /payments · order=ord-203 · idempotency_key=null · response=504</code><code>10:14:08 POST /payments · order=ord-203 · idempotency_key=null · response=201</code><code>provider transactions: txn-881 = 1 200 ₽, txn-882 = 1 200 ₽</code></div>
-      <div v-else class="evidence-log"><code>10:14:03 POST /payments · order=ord-203 · response=504</code><code>10:14:08 POST /payments · order=ord-203 · response=201</code></div>
-      <p v-if="probeWasUseful" class="detective-evidence-note">Обе попытки дошли до провайдера, ключ идемпотентности отсутствует, transaction ID разные.</p>
-      <p v-else class="detective-evidence-note">Ты не запросил логи транзакций. Доступно только сообщение пользователя и общий статус заказа.</p>
-      <label class="detective-option"><input v-model="cause" type="radio" value="missing-idempotency"><span>Повторный запрос не был идемпотентным, провайдер создал вторую транзакцию.</span></label>
-      <label class="detective-option"><input v-model="cause" type="radio" value="bank-error"><span>Банк отобразил одно списание дважды, хотя сервис создал один платёж.</span></label>
-      <label class="detective-option"><input v-model="cause" type="radio" value="stale-ui"><span>Интерфейс показал устаревший статус, серверный платёж только один.</span></label>
+      <div class="evidence-log"><code v-for="line in activeCase.evidence" :key="line">{{ line }}</code></div>
+      <p class="detective-evidence-note">{{ probeWasUseful ? activeCase.usefulEvidence : activeCase.limitedEvidence }}</p>
+      <label v-for="option in activeCase.causes" :key="option.id" class="detective-option"><input v-model="cause" type="radio" :value="option.id"><span>{{ option.label }}</span></label>
       <button class="button button-primary" type="button" :disabled="!cause" @click="advanceCause">Сформировать план проверок <ArrowRight :size="15" aria-hidden="true" /></button>
     </section>
 
     <section v-else-if="phase === 'tests'" class="detective-stage">
       <div class="knowledge-label"><Check :size="16" aria-hidden="true" /> ЭТАП 3 · ВЫБЕРИ ПРОВЕРКИ</div>
-      <p class="activity-prompt">Отметь проверки, которые подтвердят защиту от повторного эффекта.</p>
-      <label v-for="item in tests" :key="item.id" class="detective-option"><input v-model="selectedTests" type="checkbox" :value="item.id"><span>{{ item.title }}</span></label>
-      <button class="button button-primary" type="button" :disabled="selectedTests.length === 0" @click="showReport">Составить отчёт <ArrowRight :size="15" aria-hidden="true" /></button>
+      <p class="activity-prompt">Отметь проверки, которые подтвердят причину и помогут исключить повтор дефекта.</p>
+      <label v-for="item in activeCase.tests" :key="item.id" class="detective-option"><input v-model="selectedTests" type="checkbox" :value="item.id"><span>{{ item.title }}</span></label>
+      <button class="button button-primary" type="button" :disabled="selectedTests.length === 0" @click="phase = 'report'">Составить отчёт <ArrowRight :size="15" aria-hidden="true" /></button>
     </section>
 
     <section v-else-if="phase === 'report'" class="detective-stage">
       <div class="knowledge-label"><FileSearch :size="16" aria-hidden="true" /> ЭТАП 4 · ЗАФИКСИРУЙ ДЕФЕКТ</div>
-      <label class="lab-editor-label" for="detective-title">Заголовок баг-репорта</label><input id="detective-title" v-model="reportTitle" class="activity-input" maxlength="160" placeholder="Payments: повтор после timeout создаёт второе списание">
-      <label class="lab-editor-label" for="detective-steps">Ключевые шаги воспроизведения</label><textarea id="detective-steps" v-model="reportSteps" class="lab-editor" rows="4" maxlength="600" placeholder="Создать заказ и начать оплату&#10;Имитировать timeout и повторить запрос&#10;Сверить число транзакций у провайдера"></textarea>
+      <label class="lab-editor-label" for="detective-title">Заголовок баг-репорта</label><input id="detective-title" v-model="reportTitle" class="activity-input" maxlength="160" :placeholder="`${activeCase.title}: наблюдаемое последствие`">
+      <label class="lab-editor-label" for="detective-steps">Ключевые шаги воспроизведения</label><textarea id="detective-steps" v-model="reportSteps" class="lab-editor" rows="4" maxlength="600" placeholder="Создать контролируемые тестовые данные&#10;Воспроизвести запрос или событие&#10;Проверить фактическое состояние и побочный эффект"></textarea>
       <p class="lab-hint">{{ reportReady ? 'Отчёт заполнен, можно оценить расследование.' : 'Нужен конкретный заголовок и не менее двух шагов.' }}</p>
       <button class="button button-primary" type="button" :disabled="!reportReady" @click="submitInvestigation">Завершить расследование</button>
     </section>
 
-    <section v-else-if="result" class="detective-stage activity-feedback" :class="{ 'is-success': result.score >= 80 }" role="status">
-      <p class="eyebrow">ИТОГ РАССЛЕДОВАНИЯ</p><h3>{{ result.score >= 80 ? 'Причина найдена' : 'Дело закрыто с пробелами' }} · {{ result.score }}%</h3>
-      <p>Вероятная причина: повторные запросы отправлялись без idempotency key, поэтому платёжный провайдер обработал их как разные операции.</p>
+    <section v-else-if="result" class="detective-stage activity-feedback" :class="{ 'is-success': result.score >= 75 }" role="status">
+      <p class="eyebrow">ИТОГ · {{ activeCase.title }}</p><h3>{{ result.score >= 75 ? 'Причина обоснована' : 'В плане есть пробелы' }} · {{ result.score }}%</h3>
+      <p>{{ activeCase.usefulEvidence }}</p>
       <ul><li>Выбор источника данных: {{ result.probeScore }}/20</li><li>Гипотеза: {{ result.causeScore }}/30</li><li>План проверок: {{ result.testScore }}/30</li><li>Баг-репорт: {{ result.reportScore }}/20</li></ul>
-      <p v-if="savedScore !== null">Лучший результат сохранён на этом устройстве: {{ savedScore }}%.</p>
-      <button class="button button-quiet" type="button" @click="restart">Пройти расследование ещё раз</button>
+      <p v-if="savedScore !== null">Лучший результат по этому делу: {{ savedScore }}%.</p>
+      <button class="button button-quiet" type="button" @click="restart"><RotateCcw :size="15" aria-hidden="true" /> Пройти ещё раз</button>
     </section>
   </section>
 </template>

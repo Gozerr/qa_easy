@@ -990,6 +990,15 @@ button:focus-visible, a:focus-visible, summary:focus-visible { outline: 3px soli
 .project-result strong { font-size: 11px; }
 .project-result p { margin: 4px 0 0; color: var(--muted-strong); font-size: 9px; line-height: 1.5; }
 .project-local-note { margin: 0; color: var(--muted); font-size: 9px; line-height: 1.5; }
+.case-scenario-picker { display: grid; gap: 5px; max-width: 480px; color: var(--muted-strong); font-size: 10px; font-weight: 650; }
+.case-scenario-picker select { width: 100%; min-height: 40px; padding: 0 10px; border: 1px solid var(--line); border-radius: 11px; color: var(--text); background: var(--surface); font: inherit; }
+.detective-case-picker { display: grid; gap: 7px; margin: 10px 0 14px; }
+.detective-case-picker button { display: grid; gap: 4px; padding: 10px 11px; border: 1px solid var(--line); border-radius: 12px; color: var(--text); background: var(--surface); text-align: left; cursor: pointer; }
+.detective-case-picker button.is-active { border-color: var(--accent); background: var(--accent-soft); }
+.detective-case-picker button > span { color: var(--muted); font-size: 8px; font-weight: 750; letter-spacing: .07em; }
+.detective-case-picker button strong { font-size: 10px; }
+.detective-case-picker button small { color: var(--success); font-size: 9px; }
+@media (min-width: 620px) { .detective-case-picker { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (min-width: 680px) {
   .project-picker { grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: stretch; }
   .project-picker-card { grid-template-columns: 34px minmax(0, 1fr) 16px; align-content: start; min-height: 90px; padding: 11px; }

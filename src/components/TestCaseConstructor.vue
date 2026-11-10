@@ -10,6 +10,13 @@ const categories = [
   { id: 'boundary', title: 'Граничный' },
   { id: 'validation', title: 'Валидация' },
 ]
+const scenarios = [
+  { id: 'registration', title: 'Регистрация', activityId: 'case-constructor-registration', prompt: 'Форма принимает email, пароль и подтверждение пароля. Добавь сценарии четырёх типов; для каждого задай условие и наблюдаемый ожидаемый результат.' },
+  { id: 'password-reset', title: 'Сброс пароля', activityId: 'case-constructor-password-reset', prompt: 'Пользователь запрашивает ссылку для сброса пароля. Учти валидный email, неизвестный адрес, срок действия токена и несоответствие нового пароля политике.' },
+  { id: 'cart-checkout', title: 'Корзина и оформление', activityId: 'case-constructor-cart-checkout', prompt: 'Корзина пересчитывает итог при изменении количества и применении промокода. Проверь успешный заказ, недопустимые данные, границы количества и согласованность суммы.' },
+]
+const selectedScenarioId = ref(scenarios[0].id)
+const activeScenario = computed(() => scenarios.find(({ id }) => id === selectedScenarioId.value) ?? scenarios[0])
 const cases = ref([])
 const selectedCategory = ref('positive')
 const scenario = ref('')
@@ -18,7 +25,15 @@ const evaluated = ref(false)
 const coveredCategories = computed(() => new Set(cases.value.map(({ category }) => category)))
 const missingCategories = computed(() => categories.filter(({ id }) => !coveredCategories.value.has(id)))
 const score = computed(() => Math.round(((categories.length - missingCategories.value.length) / categories.length) * 100))
-const saved = computed(() => progress.practiceResults['case-constructor-registration']?.bestScore === 100)
+const saved = computed(() => progress.practiceResults[activeScenario.value.activityId]?.bestScore === 100)
+
+function changeScenario() {
+  cases.value = []
+  evaluated.value = false
+  selectedCategory.value = 'positive'
+  scenario.value = ''
+  expected.value = ''
+}
 
 function addCase() {
   const title = scenario.value.trim()
@@ -33,7 +48,7 @@ function addCase() {
 function evaluateSet() {
   evaluated.value = true
   if (missingCategories.value.length === 0 && cases.value.length >= categories.length) {
-    recordPracticeResult('case-constructor-registration', 100)
+    recordPracticeResult(activeScenario.value.activityId, 100)
   }
 }
 </script>
@@ -41,8 +56,9 @@ function evaluateSet() {
 <template>
   <section class="activity-card">
     <p class="eyebrow">TEST CASE CONSTRUCTOR · JUNIOR</p>
-    <h2>Спроектируй проверки регистрации</h2>
-    <p class="activity-prompt">Форма принимает email, пароль и подтверждение пароля. Добавь сценарии четырёх типов; для каждого задай условие и наблюдаемый ожидаемый результат.</p>
+    <label class="case-scenario-picker"><span>Функция продукта</span><select v-model="selectedScenarioId" aria-label="Выбери сценарий конструктора тест-кейсов" @change="changeScenario"><option v-for="item in scenarios" :key="item.id" :value="item.id">{{ item.title }}</option></select></label>
+    <h2>Спроектируй проверки: {{ activeScenario.title.toLocaleLowerCase('ru-RU') }}</h2>
+    <p class="activity-prompt">{{ activeScenario.prompt }} Добавь сценарии четырёх типов; для каждого задай условие и наблюдаемый ожидаемый результат.</p>
 
     <div class="activity-checklist" aria-label="Покрытие сценариев">
       <span v-for="category in categories" :key="category.id" :class="{ 'is-covered': coveredCategories.has(category.id) }"><Check v-if="coveredCategories.has(category.id)" :size="13" aria-hidden="true" />{{ category.title }}</span>
