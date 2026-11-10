@@ -160,6 +160,15 @@ button:focus-visible, a:focus-visible, summary:focus-visible { outline: 3px soli
 .welcome-heading h1 { font-size: 25px; line-height: 1.25; }
 .welcome-heading p:last-child { margin: 5px 0 0; color: var(--muted); font-size: 13px; }
 .welcome-mark { display: grid; width: 46px; height: 46px; flex: 0 0 auto; place-items: center; border: 1px solid var(--line); border-radius: 16px; color: var(--accent); background: var(--surface); box-shadow: var(--shadow-card); }
+.next-step-card { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 14px; margin: 0 0 18px; padding: 16px; overflow: hidden; border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line)); border-radius: var(--radius-card); color: #fff; background: linear-gradient(135deg, #56508f, #7864bc 58%, #8d7bd1); box-shadow: var(--shadow-raised); transition: transform 160ms ease, box-shadow 160ms ease; }
+.next-step-card::after { position: absolute; top: -75px; right: 56px; width: 185px; height: 185px; border: 1px solid #ffffff2e; border-radius: 50%; content: ''; }
+.next-step-card:hover { transform: translateY(-2px); box-shadow: 0 19px 42px rgb(74 59 132 / 28%); }
+.next-step-orbit { position: relative; z-index: 1; display: grid; width: 49px; height: 49px; place-items: center; border: 1px solid #ffffff4d; border-radius: 16px; background: #ffffff18; }
+.next-step-copy { position: relative; z-index: 1; display: grid; gap: 3px; min-width: 0; }
+.next-step-copy .eyebrow { margin: 0; color: #e1dcff; font-size: 9px; }
+.next-step-copy strong { font-size: 17px; line-height: 1.2; }
+.next-step-copy small { overflow: hidden; color: #ece9ff; font-size: 11px; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
+.next-step-action { position: relative; z-index: 1; display: flex; align-items: center; gap: 4px; color: #fff; font-size: 11px; font-weight: 750; }
 
 .dashboard-progress { margin: 0 0 18px; padding: 18px 19px 14px; border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--surface); box-shadow: var(--shadow-card); }
 .dashboard-progress-heading { gap: 8px; }
@@ -424,6 +433,25 @@ button:focus-visible, a:focus-visible, summary:focus-visible { outline: 3px soli
 .leaderboard-your-rank strong { color: var(--accent); }
 .leaderboard-error { color: var(--danger); font-size: 12px; }
 .leaderboard-empty, .leaderboard-loading { padding: 20px 0; color: var(--muted); font-size: 12px; }
+.leaderboard-arena { margin: 22px 0 0; padding: 15px 15px 12px; overflow: hidden; border: 1px solid color-mix(in srgb, var(--accent) 34%, var(--line)); border-radius: var(--radius-card); color: #fff; background: radial-gradient(circle at 50% 10%, #9182da 0%, #5b548f 47%, #333852 100%); box-shadow: var(--shadow-raised); }
+.leaderboard-arena-heading { display: flex; align-items: center; justify-content: space-between; color: #dcd7ff; font-size: 9px; font-weight: 800; letter-spacing: .07em; }
+.leaderboard-arena-heading span:first-child { display: flex; align-items: center; gap: 6px; color: #fff; }
+.podium { display: flex; min-height: 177px; align-items: end; justify-content: center; gap: 7px; padding-top: 10px; }
+.podium-player { position: relative; display: grid; width: min(31%, 145px); align-items: center; justify-items: center; gap: 4px; text-align: center; }
+.podium-player strong { width: 100%; overflow: hidden; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.podium-player small { display: flex; align-items: center; gap: 3px; color: #e5e2ff; font-size: 9px; }
+.podium-step { display: grid; width: 100%; height: 38px; margin-top: 5px; place-items: center; border-radius: 10px 10px 0 0; color: #282941; background: #c7b9ff; font-size: 18px; font-weight: 850; }
+.podium-1 { order: 2; }.podium-1 .podium-step { height: 64px; color: #47340b; background: linear-gradient(135deg, #ffe47e, #e6b849); }.podium-2 { order: 1; }.podium-2 .podium-step { height: 46px; background: linear-gradient(135deg, #e9ecf5, #a7afc5); }.podium-3 { order: 3; }.podium-3 .podium-step { height: 33px; color: #543821; background: linear-gradient(135deg, #e5aa79, #b97347); }
+.podium-crown { position: absolute; top: -23px; display: grid; place-items: center; color: #ffe18b; filter: drop-shadow(0 2px 4px #241d45); }
+.leaderboard-arena-rank { margin: 8px 0 0; padding-top: 10px; border-top: 1px solid #ffffff26; color: #dedaff; font-size: 11px; text-align: center; }.leaderboard-arena-rank strong { color: #fff; }
+.leaderboard-game-list { display: grid; gap: 8px; }
+.leaderboard-player { display: grid; grid-template-columns: 29px 38px minmax(0, 1fr) auto; align-items: center; gap: 10px; min-height: 61px; padding: 9px 11px; border: 1px solid var(--line); border-radius: 15px; background: var(--surface); box-shadow: var(--shadow-card); }
+.leaderboard-player.is-current { border-color: color-mix(in srgb, var(--accent) 52%, var(--line)); background: var(--accent-soft); }
+.leaderboard-rank { display: grid; width: 29px; height: 29px; place-items: center; border-radius: 9px; color: var(--muted-strong); background: var(--surface-secondary); font-size: 12px; font-weight: 800; }
+.leaderboard-player:nth-child(1) .leaderboard-rank { color: #75590c; background: #ffebaa; }.leaderboard-player:nth-child(2) .leaderboard-rank { color: #526075; background: #e6eaf2; }.leaderboard-player:nth-child(3) .leaderboard-rank { color: #74492e; background: #f4cfb4; }
+.leaderboard-avatar { display: grid; width: 38px; height: 38px; place-items: center; border: 2px solid #ffffff66; border-radius: 13px; color: #fff; background: linear-gradient(135deg, #6d65ac, #a393ea); font-size: 14px; font-weight: 850; box-shadow: 0 3px 8px #171c3126; }
+.avatar-gold { color: #5b4000; background: linear-gradient(135deg, #fff0a8, #e8b83f); }.avatar-silver { color: #4e5a70; background: linear-gradient(135deg, #f5f6fa, #b3bbca); }.avatar-bronze { color: #63391e; background: linear-gradient(135deg, #ffd2ae, #ba7549); }
+.leaderboard-player-name { display: grid; min-width: 0; gap: 2px; }.leaderboard-player-name strong { overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }.leaderboard-player-name small { color: var(--muted); font-size: 10px; }.leaderboard-score { display: grid; justify-items: end; gap: 1px; }.leaderboard-score strong { font-size: 14px; font-variant-numeric: tabular-nums; }.leaderboard-score small { color: var(--muted); font-size: 9px; font-weight: 700; }
 .route-enter-active, .route-leave-active { transition: opacity 130ms ease, transform 130ms ease; }
 .route-enter-from { opacity: 0; transform: translateY(5px); }
 .route-leave-to { opacity: 0; transform: translateY(-3px); }
@@ -510,8 +538,11 @@ button:focus-visible, a:focus-visible, summary:focus-visible { outline: 3px soli
 .ai-drafts-section { margin: 25px 0; }
 .ai-section-heading { display: flex; align-items: center; justify-content: space-between; padding-bottom: 9px; border-bottom: 1px solid var(--line); }
 .ai-section-heading h2 { margin: 0; font-size: 17px; }
+.ai-section-heading .eyebrow { margin: 0 0 4px; }
 .ai-section-heading .icon-button { width: 36px; height: 36px; border-radius: 10px; }
-.ai-empty-state { padding: 20px 0; color: var(--muted); font-size: 13px; }
+.ai-draft-summary { display: flex; flex-wrap: wrap; gap: 8px; padding: 13px 0 5px; color: var(--muted); font-size: 11px; }.ai-draft-summary span { padding: 7px 9px; border-radius: 9px; background: var(--surface-soft); }.ai-draft-summary strong { color: var(--ink); }
+.ai-filter-tabs { display: flex; gap: 7px; padding: 10px 0; overflow-x: auto; scrollbar-width: none; }.ai-filter-tabs button { flex: 0 0 auto; min-height: 31px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 9px; color: var(--muted-strong); background: var(--surface); font-size: 10px; font-weight: 700; cursor: pointer; }.ai-filter-tabs button.is-active { border-color: var(--accent); color: var(--on-accent); background: var(--accent); }
+.ai-empty-state { display: flex; align-items: center; gap: 7px; padding: 20px 0; color: var(--muted); font-size: 13px; }
 .ai-draft-row { margin: 0; padding: 16px 0 18px; border-bottom: 1px solid var(--line); }
 .ai-draft-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; color: var(--muted); font-size: 10px; }
 .ai-status { padding: 4px 7px; border-radius: 6px; color: var(--muted-strong); background: var(--surface-secondary); font-weight: 700; }

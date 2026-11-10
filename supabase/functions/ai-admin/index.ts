@@ -3,8 +3,10 @@ import { verifySessionToken } from '../_shared/sessionToken.ts'
 import {
   GENERATOR_MODEL,
   REVIEWER_MODEL,
+  createOpenRouterHeaders,
   isSoleAdmin,
   isZeroPricedModel,
+  modelRequestFailureCode,
   parseModelJson,
   reviewerPayload,
   validateGeneratedQuestion,
@@ -43,23 +45,18 @@ async function assertConfiguredFreeModels() {
 async function callModel(apiKey: string, model: string, system: string, user: string) {
   const response = await fetch(OPENROUTER_CHAT_URL, {
     method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-      ...(Deno.env.get('PUBLIC_APP_URL') ? { 'HTTP-Referer': Deno.env.get('PUBLIC_APP_URL')! } : {}),
-      'X-Title': 'QA на пальцах',
-    },
+    headers: createOpenRouterHeaders(apiKey, Deno.env.get('PUBLIC_APP_URL')),
     body: JSON.stringify({
       model,
       temperature: 0.2,
       max_tokens: 1_500,
       response_format: { type: 'json_object' },
-      provider: { allow_fallbacks: false, data_collection: 'deny' },
+      provider: { allow_fallbacks: false },
       messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
     }),
     signal: AbortSignal.timeout(45_000),
   })
-  if (!response.ok) throw new Error('model_request_failed')
+  if (!response.ok) throw new Error(modelRequestFailureCode(response.status))
   const result = await response.json()
   const content = result?.choices?.[0]?.message?.content
   return parseModelJson(content)

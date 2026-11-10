@@ -1,6 +1,6 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
-import { RefreshCw, Trophy } from '@lucide/vue'
+import { Crown, RefreshCw, Trophy, Zap } from '@lucide/vue'
 import PageHeading from '../components/PageHeading.vue'
 import { useProgress } from '../composables/useProgress.js'
 import { fetchLeaderboard, updateLeaderboardPreferences } from '../lib/cloudApi.js'
@@ -14,6 +14,15 @@ const saving = ref(false)
 const error = ref('')
 const message = ref('')
 const canSave = computed(() => !saving.value && (!enabled.value || /^[\p{L}\p{N}][\p{L}\p{N} _-]{1,23}$/u.test(displayName.value.trim())))
+const podium = computed(() => leaderboard.value?.entries.filter(({ rank }) => rank <= 3) ?? [])
+
+function avatarLetter(name) {
+  return name?.trim().slice(0, 1).toLocaleUpperCase('ru-RU') || '?'
+}
+
+function avatarTone(rank) {
+  return ['gold', 'silver', 'bronze'][rank - 1] ?? 'default'
+}
 
 async function refresh() {
   if (cloudStatus.value !== 'ready') return
@@ -91,6 +100,19 @@ watch(cloudStatus, (status) => {
         </div>
       </form>
 
+      <section v-if="podium.length" class="leaderboard-arena" aria-label="Лидеры недели">
+        <div class="leaderboard-arena-heading"><span><Crown :size="17" aria-hidden="true" /> ЗАЛ СЛАВЫ</span><span>СЕЗОН 01</span></div>
+        <div class="podium">
+          <article v-for="entry in podium" :key="entry.rank" class="podium-player" :class="`podium-${entry.rank}`">
+            <span class="podium-crown" v-if="entry.rank === 1"><Crown :size="19" aria-hidden="true" /></span>
+            <span class="leaderboard-avatar" :class="`avatar-${avatarTone(entry.rank)}`">{{ avatarLetter(entry.displayName) }}</span>
+            <strong>{{ entry.displayName }}</strong><small><Zap :size="12" aria-hidden="true" /> {{ entry.xp }} XP</small>
+            <span class="podium-step">{{ entry.rank }}</span>
+          </article>
+        </div>
+        <p v-if="leaderboard?.currentUserRank" class="leaderboard-arena-rank">Твой рекорд: <strong>#{{ leaderboard.currentUserRank }}</strong> из {{ leaderboard.totalParticipants }}</p>
+      </section>
+
       <div class="leaderboard-table-heading">
         <div>
           <p class="eyebrow">ТОП УЧАСТНИКОВ</p>
@@ -109,20 +131,13 @@ watch(cloudStatus, (status) => {
       <p v-else-if="leaderboard && leaderboard.entries.length === 0" class="leaderboard-empty">
         Пока никто не включил участие. Стань первым участником.
       </p>
-      <div v-else-if="leaderboard" class="leaderboard-table-wrap">
-        <table class="leaderboard-table">
-          <thead>
-            <tr><th scope="col">Место</th><th scope="col">Участник</th><th scope="col">XP</th><th scope="col">Точность</th></tr>
-          </thead>
-          <tbody>
-            <tr v-for="entry in leaderboard.entries" :key="entry.rank" :class="{ 'is-current': entry.rank === leaderboard.currentUserRank }">
-              <td class="leaderboard-rank">#{{ entry.rank }}</td>
-              <th scope="row">{{ entry.displayName }}</th>
-              <td>{{ entry.xp }}</td>
-              <td>{{ entry.accuracy }}%</td>
-            </tr>
-          </tbody>
-        </table>
+      <div v-else-if="leaderboard" class="leaderboard-game-list">
+        <article v-for="entry in leaderboard.entries" :key="entry.rank" class="leaderboard-player" :class="{ 'is-current': entry.rank === leaderboard.currentUserRank }">
+          <strong class="leaderboard-rank">{{ entry.rank }}</strong>
+          <span class="leaderboard-avatar" :class="`avatar-${avatarTone(entry.rank)}`">{{ avatarLetter(entry.displayName) }}</span>
+          <span class="leaderboard-player-name"><strong>{{ entry.displayName }}</strong><small>{{ entry.accuracy }}% точность</small></span>
+          <span class="leaderboard-score"><strong>{{ entry.xp }}</strong><small>XP</small></span>
+        </article>
       </div>
     </template>
   </div>

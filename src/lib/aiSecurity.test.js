@@ -1,12 +1,28 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
-import { isSoleAdmin, isZeroPricedModel } from '../../supabase/functions/_shared/aiContent.ts'
+import { createOpenRouterHeaders, isSoleAdmin, isZeroPricedModel, modelRequestFailureCode } from '../../supabase/functions/_shared/aiContent.ts'
 
 const migration = readFileSync(new URL('../../supabase/migrations/20261110000000_ai_content_workflow.sql', import.meta.url), 'utf8')
 const endpoint = readFileSync(new URL('../../supabase/functions/ai-admin/index.ts', import.meta.url), 'utf8')
 const contentHelper = readFileSync(new URL('../../supabase/functions/_shared/aiContent.ts', import.meta.url), 'utf8')
 
 describe('AI admin security boundary', () => {
+  it('builds a native Headers instance for OpenRouter requests', () => {
+    const headers = createOpenRouterHeaders('test-key', 'https://gozerr.github.io/qa_easy/')
+    expect(headers).toBeInstanceOf(Headers)
+    expect(headers.get('authorization')).toBe('Bearer test-key')
+    expect(headers.get('content-type')).toBe('application/json')
+    expect(headers.get('http-referer')).toBe('https://gozerr.github.io/qa_easy/')
+    expect(headers.get('x-title')).toBe('QA na paltsakh')
+    expect(endpoint).toContain('headers: createOpenRouterHeaders(apiKey, Deno.env.get(\'PUBLIC_APP_URL\'))')
+  })
+
+  it('retains only a safe provider HTTP status on request failures', () => {
+    expect(modelRequestFailureCode(401)).toBe('model_request_401')
+    expect(modelRequestFailureCode(429)).toBe('model_request_429')
+    expect(modelRequestFailureCode(999)).toBe('model_request_failed')
+  })
+
   it('accepts only exact catalog IDs with explicit zero prompt and completion prices', () => {
     expect(isZeroPricedModel({ id: 'approved:free', pricing: { prompt: '0', completion: 0 } }, 'approved:free')).toBe(true)
     expect(isZeroPricedModel({ id: 'paid', pricing: { prompt: '0.01', completion: '0' } }, 'paid')).toBe(false)
@@ -47,6 +63,7 @@ describe('AI admin security boundary', () => {
     expect(contentHelper).toContain("nvidia/nemotron-3.5-super-vl:free")
     expect(endpoint).toContain('assertConfiguredFreeModels()')
     expect(endpoint).toContain('allow_fallbacks: false')
+    expect(endpoint).not.toContain("data_collection: 'deny'")
     expect(endpoint).toContain('attempt <= 2')
     expect(endpoint).toContain("response_format: { type: 'json_object' }")
   })

@@ -26,6 +26,21 @@ export function isZeroPricedModel(model: unknown, expectedId: string) {
     && Number(prices.completion) === 0
 }
 
+export function createOpenRouterHeaders(apiKey: string, appUrl?: string): Headers {
+  const headers = new Headers()
+  headers.set('Authorization', `Bearer ${apiKey}`)
+  headers.set('Content-Type', 'application/json')
+  if (appUrl) headers.set('HTTP-Referer', appUrl)
+  headers.set('X-Title', 'QA na paltsakh')
+  return headers
+}
+
+export function modelRequestFailureCode(status: number) {
+  return Number.isInteger(status) && status >= 100 && status <= 599
+    ? `model_request_${status}`
+    : 'model_request_failed'
+}
+
 export function validateGenerationRequest(value: Record<string, unknown>) {
   if (typeof value.topic !== 'string' || value.topic.trim().length < 3 || value.topic.length > 300) return null
   if (typeof value.category !== 'string' || !CATEGORIES.has(value.category)) return null

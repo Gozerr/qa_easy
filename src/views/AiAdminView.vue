@@ -1,6 +1,6 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { Check, CircleAlert, LoaderCircle, RefreshCw, Sparkles, Upload } from '@lucide/vue'
+import { Check, CircleAlert, Clock3, LoaderCircle, RefreshCw, Sparkles, Upload } from '@lucide/vue'
 import PageHeading from '../components/PageHeading.vue'
 import { fetchAiAdminStatus, fetchAiDrafts, generateAiDraft, publishAiDraft } from '../lib/cloudApi.js'
 
@@ -14,7 +14,20 @@ const loading = ref(false)
 const publishingId = ref('')
 const error = ref('')
 const notice = ref('')
+const activeFilter = ref('all')
 const canGenerate = computed(() => enabled.value && !loading.value && topic.value.trim().length >= 3)
+const draftCounts = computed(() => drafts.value.reduce((counts, draft) => {
+  counts[draft.status] = (counts[draft.status] ?? 0) + 1
+  return counts
+}, {}))
+const visibleDrafts = computed(() => activeFilter.value === 'all' ? drafts.value : drafts.value.filter(({ status }) => status === activeFilter.value))
+
+function failureMessage(code) {
+  if (code === 'model_request_429') return 'Лимит бесплатного AI-провайдера исчерпан. Повтори после сброса лимита или используй ключ с пополненным балансом.'
+  if (code === 'model_request_401') return 'Ключ OpenRouter отклонён. Проверь OPENROUTER_API_KEY в Supabase Secrets.'
+  if (code === 'model_request_402') return 'Для этого ключа недостаточно доступного лимита OpenRouter.'
+  return code
+}
 
 async function refresh() {
   error.value = ''
@@ -118,9 +131,13 @@ onMounted(initialize)
       <p v-if="notice" class="ai-admin-message" role="status">{{ notice }}</p>
 
       <section class="ai-drafts-section" aria-labelledby="ai-drafts-title">
-        <div class="ai-section-heading"><h2 id="ai-drafts-title">Черновики</h2><button class="icon-button" type="button" aria-label="Обновить черновики" title="Обновить" @click="initialize"><RefreshCw :size="17" /></button></div>
-        <p v-if="drafts.length === 0" class="ai-empty-state">Черновиков пока нет.</p>
-        <article v-for="draft in drafts" :key="draft.id" class="ai-draft-row">
+        <div class="ai-section-heading"><div><p class="eyebrow">КОНТРОЛЬ КАЧЕСТВА</p><h2 id="ai-drafts-title">Черновики</h2></div><button class="icon-button" type="button" aria-label="Обновить черновики" title="Обновить" @click="initialize"><RefreshCw :size="17" /></button></div>
+        <div class="ai-draft-summary"><span><strong>{{ draftCounts.approved ?? 0 }}</strong> ждут публикации</span><span><strong>{{ draftCounts.failed ?? 0 }}</strong> требуют внимания</span></div>
+        <div class="ai-filter-tabs" role="group" aria-label="Фильтр черновиков">
+          <button v-for="filter in [{ id: 'all', label: 'Все' }, { id: 'approved', label: 'Готовы' }, { id: 'failed', label: 'Ошибки' }, { id: 'published', label: 'Опубликованы' }]" :key="filter.id" type="button" :class="{ 'is-active': activeFilter === filter.id }" :aria-pressed="activeFilter === filter.id" @click="activeFilter = filter.id">{{ filter.label }}</button>
+        </div>
+        <p v-if="visibleDrafts.length === 0" class="ai-empty-state"><Clock3 :size="17" aria-hidden="true" /> Здесь пока нет черновиков.</p>
+        <article v-for="draft in visibleDrafts" :key="draft.id" class="ai-draft-row">
           <div class="ai-draft-meta"><span class="ai-status" :class="`status-${draft.status}`">{{ statusLabel(draft.status) }}</span><span>{{ draft.category }} · {{ draft.difficulty }}</span><span v-if="draft.revisionCount">Правок: {{ draft.revisionCount }}</span></div>
           <p class="ai-draft-topic">{{ draft.topic }}</p>
           <template v-if="draft.content">
@@ -133,7 +150,7 @@ onMounted(initialize)
               <ul v-if="draft.review.issues.length"><li v-for="issue in draft.review.issues" :key="issue">{{ issue }}</li></ul>
             </div>
           </template>
-          <p v-if="draft.failureCode" class="ai-failure-code">Ошибка обработки: {{ draft.failureCode }}</p>
+          <p v-if="draft.failureCode" class="ai-failure-code">{{ failureMessage(draft.failureCode) }}</p>
           <div class="ai-draft-actions">
             <span class="ai-model-label">{{ draft.generatorModel || 'Gemma 4 31B' }} · {{ draft.reviewerModel || 'Nemotron 3.5' }}</span>
             <button v-if="draft.status === 'approved'" class="button button-primary" type="button" :disabled="publishingId === draft.id" @click="publish(draft)">

@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
-import { ArrowRight, Award, BookOpen, Bug, CalendarCheck, Check, ChevronRight, Flame, MessageCircleQuestion, Sparkles } from '@lucide/vue'
+import { ArrowRight, Award, BookOpen, Bug, CalendarCheck, Check, ChevronRight, Flame, MessageCircleQuestion, Play, Sparkles, Target } from '@lucide/vue'
 import { useUtcDate } from '../composables/useUtcDate.js'
 import { useQuestionBank } from '../composables/useQuestionBank.js'
 import { useProgress } from '../composables/useProgress.js'
@@ -13,6 +13,10 @@ const dailyTask = computed(() => getDaily(today.value))
 const dailyQuestion = computed(() => dailyTask.value.question)
 const progressPercent = computed(() => Math.min(100, Math.round((progress.completedQuestionIds.length / questions.length) * 100)))
 const dailyDone = computed(() => progress.dailyCompletions.includes(today.value))
+const nextStep = computed(() => progress.answeredCount === 0
+  ? { to: '/theory', label: 'Начать с основ', detail: '5 коротких тем для уверенного старта', icon: BookOpen }
+  : { to: '/practice', label: 'Продолжить тренировку', detail: progressPercent.value < 100 ? `Открыто ${progress.completedQuestionIds.length} из ${questions.value.length} вопросов` : 'Ты прошёл весь базовый банк — закрепим навыки', icon: Play })
+const level = computed(() => Math.max(1, Math.floor(progress.xp / 100) + 1))
 const todayLabel = computed(() => new Intl.DateTimeFormat('ru-RU', {
   weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC',
 }).format(new Date(`${today.value}T00:00:00Z`)).toLocaleUpperCase('ru-RU'))
@@ -32,8 +36,14 @@ const featureCards = computed(() => [
         <h1>Привет, тестировщик!</h1>
         <p>Проверим пару гипотез?</p>
       </div>
-      <span class="welcome-mark"><Sparkles :size="21" aria-hidden="true" /></span>
+      <span class="welcome-mark"><Target :size="21" aria-hidden="true" /></span>
     </header>
+
+    <RouterLink :to="nextStep.to" class="next-step-card">
+      <span class="next-step-orbit" aria-hidden="true"><component :is="nextStep.icon" :size="27" /></span>
+      <span class="next-step-copy"><span class="eyebrow">СЛЕДУЮЩИЙ ШАГ · УРОВЕНЬ {{ level }}</span><strong>{{ nextStep.label }}</strong><small>{{ nextStep.detail }}</small></span>
+      <span class="next-step-action">Вперёд <ArrowRight :size="17" aria-hidden="true" /></span>
+    </RouterLink>
 
     <section class="dashboard-progress" aria-label="Твой прогресс">
       <div class="dashboard-progress-heading">
@@ -65,7 +75,7 @@ const featureCards = computed(() => [
     </RouterLink>
 
     <div class="section-heading">
-      <div><p class="eyebrow">ВЫБЕРИ МАРШРУТ</p><h2>Продолжим?</h2></div>
+      <div><p class="eyebrow">ТРЕНАЖЁР</p><h2>Выбери режим</h2></div>
     </div>
 
     <div class="feature-grid">
